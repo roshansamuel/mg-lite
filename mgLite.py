@@ -33,6 +33,7 @@
 
 # Import all necessary modules
 import numpy as np
+import matplotlib.pyplot as plt
 
 ################################ GRID CONSTANTS #################################
 
@@ -84,28 +85,29 @@ zeroBC = False
 
 ############################## MULTI-GRID SOLVER ###############################
 
+np.set_printoptions(precision=3)
+
 def multigrid(H):
     global N
     global vcCnt
 
-    Pp = np.zeros(N[0] + 2)
-    chMat = np.ones(N[0] + 2)
+    rData[vLev] = H
+    chMat = np.zeros(N[0] + 2)
 
     for i in range(vcCnt):
-        Pp = v_cycle(Pp, H)
+        v_cycle()
 
-        chMat = laplace(Pp)
-        resVal = np.amax(np.abs(H[1:N+1] - chMat[1:N+1]))
+        chMat = laplace(pData[vLev])
+        resVal = np.amax(np.abs(H[1:N[0]+1] - chMat[1:N[0]+1]))
 
         print("Residual after V-Cycle ", i, " is ", resVal)
 
-    return Pp
+    return pData[vLev]
 
 
 #Multigrid V-cycle without the use of recursion
-def v_cycle(P, H):
+def v_cycle():
     global hx
-    global sInd
     global VDepth
     global vLev, zeroBC
     global pstSm, preSm
@@ -114,29 +116,42 @@ def v_cycle(P, H):
     zeroBC = False
 
     # Pre-smoothing
-    P = smooth(preSm)
+    smooth(preSm)
 
     zeroBC = True
     for i in range(VDepth):
+        # Compute residual
         calcResidual()
 
+        # Copy smoothed pressure for later use
+        sData[vLev] = np.copy(pData[vLev])
+
+        # Restrict to coarser level
         restrict()
 
-    # Solving the system after restriction
-    solve()
+        # Reinitialize pressure at coarser level to 0
+        pData[vLev].fill(0.0)
+
+        if vLev == VDepth:
+            solve()
+        else:
+            smooth(preSm + pstSm)
 
     # Prolongation operations
     for i in range(VDepth):
-        sInd += 1
+        # Prolong pressure to next finer level
         prolong()
-        P_corr = smooth(pstSm)
 
-    P += P_corr
+        # Add previously stored smoothed data
+        pData[vLev] += sData[vLev]
 
-    # Post-smoothing
-    P = smooth(pstSm)
+        if vLev:
+            zeroBC = True
+        else:
+            zeroBC = False
 
-    return P
+        # Post-smoothing
+        smooth(pstSm)
 
 
 #Uses jacobi iteration to smooth the solution passed to it.
@@ -146,11 +161,13 @@ def smooth(iteration_times):
     global vLev
 
     n = N[vLev]
+    tData = np.zeros(n)
     for i in range(iteration_times):
-        # WARNING: Test if both variables are same by reference!!!
-        toSmooth = imposeBC(pData[vLev])
+        imposeBC(pData[vLev])
 
-        pData[vLev][1:n+1] = (toSmooth[2:] + toSmooth[:n] - hx2[vLev]*rData[vLev][1:n+1])*0.5
+        tData = (pData[vLev][2:] + pData[vLev][:n] - hx2[vLev]*rData[vLev][1:n+1])*0.5
+
+        pData[vLev][1:n+1] = np.copy(tData)
 
 
 #Compute the residual and store it into iTemp array
@@ -193,24 +210,25 @@ def prolong():
 
 #This function solves at coarsest level using an iterative solver
 def solve():
-    global hx2
     global vLev
-    global VDepth
+    global N, hx2
     global maxCount
     global tolerance
     global pData, rData
 
-    gsFactor = ((2**VDepth)**2)*hx2[vLev]
+    n = N[vLev]
+    solLap = np.zeros(n)
 
     jCnt = 0
     while True:
+        imposeBC(pData[vLev])
+
         # Gauss-Seidel iterative solver
-        pData[vLev][1:N+1] = (pData[vLev][2:] + pData[vLev][:N] - gsFactor*rData[vLev][1:N+1])*0.5
+        pData[vLev][1:n+1] = (pData[vLev][2:] + pData[vLev][:n] - hx2[vLev]*rData[vLev][1:n+1])*0.5
 
-        solLap = np.zeros_like(pData[vLev])
-        solLap[1:N+1] = (pData[vLev][:N] - 2.0*pData[vLev][1:N+1] + pData[vLev][2:])/gsFactor
+        solLap = (pData[vLev][:n] - 2.0*pData[vLev][1:n+1] + pData[vLev][2:])/hx2[vLev]
 
-        maxErr = np.amax(np.abs(rData[vLev][1:N+1] - solLap[1:N+1]))
+        maxErr = np.amax(np.abs(rData[vLev][1:n+1] - solLap))
         if maxErr < tolerance:
             break
 
@@ -219,25 +237,23 @@ def solve():
             print("ERROR: Jacobi not converging. Aborting")
             quit()
 
-    return prev_sol
+    imposeBC(pData[vLev])
 
 
 def laplace(function):
-    global hx2
     global vLev
+    global N, hx2
 
-    # 2 subtracted from length to account for ghost points
-    N = len(function) - 2
+    n = N[vLev]
+
     gradient = np.zeros_like(function)
-
-    gradient[1:N+1] = (function[:N] - 2.0*function[1:N+1] + function[2:])/hx2[vLev]
+    gradient[1:n+1] = (function[:n] - 2.0*function[1:n+1] + function[2:])/hx2[vLev]
 
     return gradient
 
 
 def initVariables():
     global N
-    global sInd, VDepth
     global nList, pData, rData, sData, iTemp
 
     nList = np.array(N)
@@ -266,8 +282,6 @@ def imposeBC(P):
         P[0] = 2.0*pWall - P[2]
         P[-1] = 2.0*pWall - P[-3]
 
-    return P
-
 
 ############################### TEST CASE DETAIL ################################
 
@@ -289,6 +303,31 @@ def initDirichlet():
     pWall = pAnlt[1]
 
 
+############################### PLOTTING ROUTINE ################################
+
+
+def plotResult(pSoln):
+    global N
+    global pAnlt
+
+    plt.rcParams["font.family"] = "Times New Roman"
+    plt.rcParams["mathtext.fontset"] = 'cm'
+    plt.rcParams["font.weight"] = "medium"
+
+    plt.figure(figsize=(14,10))
+
+    x = np.linspace(0.0, 1.0, N[0])
+    plt.plot(x, pAnlt[1:-1], label='Analytic', marker='*', markersize=20, linewidth=4)
+    plt.plot(x, pSoln[1:-1], label='Computed', marker='+', markersize=20, linewidth=4)
+    plt.xlabel('x', fontsize=40)
+    plt.ylabel('p', fontsize=40)
+
+    plt.xticks(fontsize=30)
+    plt.yticks(fontsize=30)
+    plt.legend(fontsize=40)
+    plt.show()
+
+
 ##################################### MAIN ######################################
 
 
@@ -302,7 +341,7 @@ def main():
     mgRHS = np.ones(N[0] + 2)
     mgLHS = multigrid(mgRHS)
 
-    print(mgLHS)
+    plotResult(mgLHS)
 
 
 if __name__ == "__main__":
