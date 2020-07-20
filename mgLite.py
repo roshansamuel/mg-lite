@@ -37,19 +37,12 @@ import matplotlib.pyplot as plt
 
 ################################ GRID CONSTANTS #################################
 
-# N should be of the form 2^n + 1
-# Then there will be 2^n + 3 staggered points, including 2 ghost points
-sLst = [2**x + 1 for x in range(15)]
-
 # Choose grid size as an index from below list
 # Size index: 0 1 2 3  4  5  6  7   8   9   10   11   12   13    14
 # Grid sizes: 2 3 5 9 17 33 65 129 257 513 1025 2049 4097 8193 16385
 sInd = 7
 
 ############################# MULTI-GRID CONSTANTS ##############################
-
-# Tolerance value in iterative solver
-tolerance = 1.0e-6
 
 # Depth of each V-cycle in multigrid (ideally VDepth = sInd - 1)
 VDepth = 6
@@ -58,17 +51,21 @@ VDepth = 6
 vcCnt = 10
 
 # Number of iterations during pre-smoothing
-preSm = 2
+preSm = 3
 
 # Number of iterations during post-smoothing
-pstSm = 2
+pstSm = 3
 
-# Maximum number of iterations while solving
-maxCount = 10*sLst[sInd]
+# Tolerance value in iterative solver
+tolerance = 1.0e-6
 
 ############################### GLOBAL VARIABLES ################################
 
-# Get array of grid sizes
+# N should be of the form 2^n + 1
+# Then there will be 2^n + 3 points in total, including 2 ghost points
+sLst = [2**x + 1 for x in range(15)]
+
+# Get array of grid sizes corresponding to each level of V-Cycle
 N = sLst[sInd:sInd - VDepth - 1:-1]
 
 # Define array of grid spacings
@@ -76,6 +73,9 @@ hx = [1.0/(x-1) for x in N]
 
 # Square of hx, used in finite difference formulae
 hx2 = [x*x for x in hx]
+
+# Maximum number of iterations while solving at coarsest level
+maxCount = 10*sLst[sInd]
 
 # Integer specifying the level of V-cycle at any point while solving
 vLev = 0
@@ -85,29 +85,28 @@ zeroBC = False
 
 ############################## MULTI-GRID SOLVER ###############################
 
-np.set_printoptions(precision=3)
-
+# The root function of MG-solver, the Atrium, if you will. And H is the RHS
 def multigrid(H):
     global N
+    global pAnlt
     global vcCnt
 
-    rData[vLev] = H
-    chMat = np.zeros(N[0] + 2)
+    rData[vLev] = H[1:-1]
+    chMat = np.zeros(N[0])
 
     for i in range(vcCnt):
         v_cycle()
 
         chMat = laplace(pData[vLev])
-        resVal = np.amax(np.abs(H[1:N[0]+1] - chMat[1:N[0]+1]))
+        resVal = np.amax(np.abs(H[1:N[0]+1] - chMat))
 
-        print("Residual after V-Cycle ", i, " is ", resVal)
+        print("Residual after V-Cycle {0:2d} is {1:.4e}".format(i+1, resVal))
 
     return pData[vLev]
 
 
-#Multigrid V-cycle without the use of recursion
+# Multigrid V-cycle without the use of recursion
 def v_cycle():
-    global hx
     global VDepth
     global vLev, zeroBC
     global pstSm, preSm
@@ -126,25 +125,27 @@ def v_cycle():
         # Copy smoothed pressure for later use
         sData[vLev] = np.copy(pData[vLev])
 
-        # Restrict to coarser level
+        # Restrict to coarser level - down we go!
         restrict()
 
-        # Reinitialize pressure at coarser level to 0
+        # Reinitialize pressure at coarser level to 0 - this is critical!
         pData[vLev].fill(0.0)
 
+        # If the coarsest level is reached, solve. Otherwise, keep smoothing!
         if vLev == VDepth:
             solve()
         else:
-            smooth(preSm + pstSm)
+            smooth(preSm)
 
     # Prolongation operations
     for i in range(VDepth):
-        # Prolong pressure to next finer level
+        # Prolong pressure to next finer level - up we go!
         prolong()
 
         # Add previously stored smoothed data
         pData[vLev] += sData[vLev]
 
+        # Apply homogenous BC so long as we are not at finest mesh (at which vLev = 0)
         if vLev:
             zeroBC = True
         else:
@@ -154,32 +155,31 @@ def v_cycle():
         smooth(pstSm)
 
 
-#Uses jacobi iteration to smooth the solution passed to it.
-def smooth(iteration_times):
+# Smooths the solution sCount times using Gauss-Seidel smoother
+def smooth(sCount):
     global N
     global hx2
     global vLev
 
     n = N[vLev]
-    tData = np.zeros(n)
-    for i in range(iteration_times):
+    for i in range(sCount):
         imposeBC(pData[vLev])
 
-        tData = (pData[vLev][2:] + pData[vLev][:n] - hx2[vLev]*rData[vLev][1:n+1])*0.5
+        # Gauss-Seidel smoothing
+        for i in range(1, n+1):
+            pData[vLev][i] = (pData[vLev][i+1] + pData[vLev][i-1] - hx2[vLev]*rData[vLev][i-1])*0.5
 
-        pData[vLev][1:n+1] = np.copy(tData)
 
-
-#Compute the residual and store it into iTemp array
+# Compute the residual and store it into iTemp array
 def calcResidual():
     global vLev
     global iTemp, rData, pData
 
     iTemp[vLev].fill(0.0)
-    iTemp[vLev] = rData[vLev] - laplace(pData[vLev])
+    iTemp[vLev][1:-1] = rData[vLev] - laplace(pData[vLev])
 
 
-#Reduces the size of the array to a lower level, 2^(n - 1) + 1
+# Reduces the size of the array to a lower level, 2^(n - 1) + 1
 def restrict():
     global vLev
     global iTemp, rData
@@ -189,7 +189,40 @@ def restrict():
 
     for i in range(1, N[vLev] + 1):
         i2 = i*2
-        rData[vLev][i] = 0.5*(iTemp[pLev][i2 - 1]) + 0.25*(iTemp[pLev][i2 - 2] + iTemp[pLev][i2])
+        rData[vLev][i-1] = 0.5*iTemp[pLev][i2 - 1] + 0.25*(iTemp[pLev][i2 - 2] + iTemp[pLev][i2])
+
+
+# Solves at coarsest level using an iterative solver
+def solve():
+    global vLev
+    global N, hx2
+    global maxCount
+    global tolerance
+    global pData, rData
+
+    n = N[vLev]
+    solLap = np.zeros(n)
+
+    jCnt = 0
+    while True:
+        imposeBC(pData[vLev])
+
+        # Gauss-Seidel iterative solver
+        for i in range(1, n+1):
+            pData[vLev][i] = (pData[vLev][i+1] + pData[vLev][i-1] - hx2[vLev]*rData[vLev][i-1])*0.5
+
+        solLap = (pData[vLev][:n] - 2.0*pData[vLev][1:n+1] + pData[vLev][2:])/hx2[vLev]
+
+        maxErr = np.amax(np.abs(rData[vLev] - solLap))
+        if maxErr < tolerance:
+            break
+
+        jCnt += 1
+        if jCnt > maxCount:
+            print("MAYDAY! Iterative solver refuses to converge.")
+            quit()
+
+    imposeBC(pData[vLev])
 
 
 # Increases the size of the array to a higher level, 2^(n + 1) + 1
@@ -208,59 +241,29 @@ def prolong():
             pData[vLev][i] = (pData[pLev][i2] + pData[pLev][i2 - 1])*0.5;
 
 
-#This function solves at coarsest level using an iterative solver
-def solve():
-    global vLev
-    global N, hx2
-    global maxCount
-    global tolerance
-    global pData, rData
-
-    n = N[vLev]
-    solLap = np.zeros(n)
-
-    jCnt = 0
-    while True:
-        imposeBC(pData[vLev])
-
-        # Gauss-Seidel iterative solver
-        pData[vLev][1:n+1] = (pData[vLev][2:] + pData[vLev][:n] - hx2[vLev]*rData[vLev][1:n+1])*0.5
-
-        solLap = (pData[vLev][:n] - 2.0*pData[vLev][1:n+1] + pData[vLev][2:])/hx2[vLev]
-
-        maxErr = np.amax(np.abs(rData[vLev][1:n+1] - solLap))
-        if maxErr < tolerance:
-            break
-
-        jCnt += 1
-        if jCnt > maxCount:
-            print("ERROR: Jacobi not converging. Aborting")
-            quit()
-
-    imposeBC(pData[vLev])
-
-
+# Computes the 1D laplacian of function
 def laplace(function):
     global vLev
     global N, hx2
 
     n = N[vLev]
 
-    gradient = np.zeros_like(function)
-    gradient[1:n+1] = (function[:n] - 2.0*function[1:n+1] + function[2:])/hx2[vLev]
+    gradient = np.zeros(n)
+    gradient = (function[:n] - 2.0*function[1:n+1] + function[2:])/hx2[vLev]
 
     return gradient
 
 
+# Initialize the arrays used in MG algorithm
 def initVariables():
     global N
-    global nList, pData, rData, sData, iTemp
+    global pData, rData, sData, iTemp
 
     nList = np.array(N)
 
+    rData = [np.zeros(x) for x in nList]
     pData = [np.zeros(x) for x in nList + 2]
 
-    rData = [np.zeros_like(x) for x in pData]
     sData = [np.zeros_like(x) for x in pData]
     iTemp = [np.zeros_like(x) for x in pData]
 
@@ -268,6 +271,7 @@ def initVariables():
 ############################## BOUNDARY CONDITION ###############################
 
 
+# The name of this function is self-explanatory. It imposes BC on P
 def imposeBC(P):
     global pWall
     global zeroBC
@@ -286,6 +290,7 @@ def imposeBC(P):
 ############################### TEST CASE DETAIL ################################
 
 
+# Calculate the analytical solution and its corresponding Dirichlet BC values
 def initDirichlet():
     global N
     global hx
@@ -303,10 +308,21 @@ def initDirichlet():
     pWall = pAnlt[1]
 
 
+# Compute the error in pSoln w.r.t the analytical solution
+def computeError(pSoln):
+    global pAnlt
+
+    pErr = pAnlt[1:-1] - pSoln[1:-1]
+    errVal = np.amax(pErr)
+
+    print("\nError in solution after this endeavour is {0:.4e}".format(errVal))
+
+
 ############################### PLOTTING ROUTINE ################################
 
 
-def plotResult(pSoln):
+# Surprise! This function.... plots!
+def plotResult(pSoln, plotType):
     global N
     global pAnlt
 
@@ -317,10 +333,21 @@ def plotResult(pSoln):
     plt.figure(figsize=(14,10))
 
     x = np.linspace(0.0, 1.0, N[0])
-    plt.plot(x, pAnlt[1:-1], label='Analytic', marker='*', markersize=20, linewidth=4)
-    plt.plot(x, pSoln[1:-1], label='Computed', marker='+', markersize=20, linewidth=4)
-    plt.xlabel('x', fontsize=40)
-    plt.ylabel('p', fontsize=40)
+    if plotType == 0:
+        plt.plot(x, pAnlt[1:-1], label='Analytic', marker='*', markersize=20, linewidth=4)
+        plt.plot(x, pSoln[1:-1], label='Computed', marker='+', markersize=20, linewidth=4)
+        plt.xlabel('x', fontsize=40)
+        plt.ylabel('p', fontsize=40)
+
+    elif plotType == 1:
+        pErr = pAnlt[1:-1] - pSoln[1:-1]
+        plt.semilogy(x, pErr, label='Error', marker='*', markersize=20, linewidth=4)
+        plt.xlabel('x', fontsize=40)
+        plt.ylabel('e_p', fontsize=40)
+
+    else:
+        print("\nSomething is fishy with the arguments to plotting function")
+        exit()
 
     plt.xticks(fontsize=30)
     plt.yticks(fontsize=30)
@@ -333,7 +360,6 @@ def plotResult(pSoln):
 
 def main():
     global N
-    global nList, iTemp
 
     initDirichlet()
     initVariables()
@@ -341,7 +367,8 @@ def main():
     mgRHS = np.ones(N[0] + 2)
     mgLHS = multigrid(mgRHS)
 
-    plotResult(mgLHS)
+    computeError(mgLHS)
+    plotResult(mgLHS, 3)
 
 
 if __name__ == "__main__":
