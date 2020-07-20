@@ -106,21 +106,22 @@ def main():
 # The root function of MG-solver, the Atrium, if you will. And H is the RHS
 def multigrid(H):
     global N
-    global pAnlt
     global vcCnt
+    global pData, rData
 
-    rData[vLev] = H[1:-1]
-    chMat = np.zeros(N[0])
+    n = N[0]
+    rData[0] = H[1:-1]
+    chMat = np.zeros(n)
 
     for i in range(vcCnt):
         v_cycle()
 
-        chMat = laplace(pData[vLev])
-        resVal = np.amax(np.abs(H[1:N[0]+1] - chMat))
+        chMat = laplace(pData[0])
+        resVal = np.amax(np.abs(H[1:n+1] - chMat))
 
         print("Residual after V-Cycle {0:2d} is {1:.4e}".format(i+1, resVal))
 
-    return pData[vLev]
+    return pData[0]
 
 
 # Multigrid V-cycle without the use of recursion
@@ -178,14 +179,15 @@ def smooth(sCount):
     global N
     global hx2
     global vLev
+    global rData, pData
 
     n = N[vLev]
     for i in range(sCount):
         imposeBC(pData[vLev])
 
         # Gauss-Seidel smoothing
-        for i in range(1, n+1):
-            pData[vLev][i] = (pData[vLev][i+1] + pData[vLev][i-1] - hx2[vLev]*rData[vLev][i-1])*0.5
+        for j in range(1, n+1):
+            pData[vLev][j] = (pData[vLev][j+1] + pData[vLev][j-1] - hx2[vLev]*rData[vLev][j-1])*0.5
 
 
 # Compute the residual and store it into iTemp array
