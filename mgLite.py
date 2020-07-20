@@ -56,7 +56,7 @@ preSm = 3
 # Number of iterations during post-smoothing
 pstSm = 3
 
-# Tolerance value in iterative solver
+# Tolerance value for iterative solver
 tolerance = 1.0e-6
 
 ############################### GLOBAL VARIABLES ################################
@@ -83,7 +83,25 @@ vLev = 0
 # Flag to determine if non-zero homogenous BC has to be applied or not
 zeroBC = False
 
+
+##################################### MAIN ######################################
+
+
+def main():
+    global N
+
+    initDirichlet()
+    initVariables()
+
+    mgRHS = np.ones(N[0] + 2)
+    mgLHS = multigrid(mgRHS)
+
+    computeError(mgLHS)
+    plotResult(mgLHS, 0)
+
+
 ############################## MULTI-GRID SOLVER ###############################
+
 
 # The root function of MG-solver, the Atrium, if you will. And H is the RHS
 def multigrid(H):
@@ -155,7 +173,7 @@ def v_cycle():
         smooth(pstSm)
 
 
-# Smooths the solution sCount times using Gauss-Seidel smoother
+# Smoothens the solution sCount times using Gauss-Seidel smoother
 def smooth(sCount):
     global N
     global hx2
@@ -181,6 +199,7 @@ def calcResidual():
 
 # Reduces the size of the array to a lower level, 2^(n - 1) + 1
 def restrict():
+    global N
     global vLev
     global iTemp, rData
 
@@ -227,6 +246,7 @@ def solve():
 
 # Increases the size of the array to a higher level, 2^(n + 1) + 1
 def prolong():
+    global N
     global vLev
     global pData
 
@@ -321,7 +341,10 @@ def computeError(pSoln):
 ############################### PLOTTING ROUTINE ################################
 
 
-# Surprise! This function.... plots!
+# Surprise! This function.... plots! It plots pSoln according to the plotType
+# plotType = 0: Plot computed and analytic solution together
+# plotType = 1: Plot error in computed solution w.r.t. analytic solution
+# Any other value of plotType, and the function will barf.
 def plotResult(pSoln, plotType):
     global N
     global pAnlt
@@ -355,20 +378,7 @@ def plotResult(pSoln, plotType):
     plt.show()
 
 
-##################################### MAIN ######################################
-
-
-def main():
-    global N
-
-    initDirichlet()
-    initVariables()
-
-    mgRHS = np.ones(N[0] + 2)
-    mgLHS = multigrid(mgRHS)
-
-    computeError(mgLHS)
-    plotResult(mgLHS, 3)
+############################## THAT'S IT, FOLKS!! ###############################
 
 
 if __name__ == "__main__":
