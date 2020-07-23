@@ -189,6 +189,8 @@ def smooth(sCount):
         for j in range(1, n+1):
             pData[vLev][j] = (pData[vLev][j+1] + pData[vLev][j-1] - hx2[vLev]*rData[vLev][j-1])*0.5
 
+    imposeBC(pData[vLev])
+
 
 # Compute the residual and store it into iTemp array
 def calcResidual():
@@ -232,9 +234,7 @@ def solve():
         for i in range(1, n+1):
             pData[vLev][i] = (pData[vLev][i+1] + pData[vLev][i-1] - hx2[vLev]*rData[vLev][i-1])*0.5
 
-        solLap = (pData[vLev][:n] - 2.0*pData[vLev][1:n+1] + pData[vLev][2:])/hx2[vLev]
-
-        maxErr = np.amax(np.abs(rData[vLev] - solLap))
+        maxErr = np.amax(np.abs(rData[vLev] - laplace(pData[vLev])))
         if maxErr < tolerance:
             break
 
