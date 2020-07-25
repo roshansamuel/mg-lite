@@ -33,6 +33,7 @@
 
 # Import all necessary modules
 import sys
+import mgLite as mgSolver
 import PyQt5.QtGui as qgui
 import PyQt5.QtCore as qcore
 import PyQt5.QtWidgets as qwid
@@ -44,6 +45,7 @@ class mainWindow(qwid.QMainWindow):
         super().__init__()
 
         self.setFixedSize(450, 500)
+        self.mdi = qwid.QMdiArea()
         self.initUI()
 
     def initUI(self):
@@ -84,20 +86,20 @@ class mainWindow(qwid.QMainWindow):
         pstLabel.resize(pstLabel.sizeHint())
         pstLabel.move(30, 232)
 
-        self.vcLEdit = qwid.QSpinBox(self)
-        self.vcLEdit.setMinimum(1)
-        self.vcLEdit.setMaximum(32)
-        self.vcLEdit.move(300, 125)
+        self.vcSBox = qwid.QSpinBox(self)
+        self.vcSBox.setMinimum(1)
+        self.vcSBox.setMaximum(32)
+        self.vcSBox.move(300, 125)
 
-        self.preLEdit = qwid.QSpinBox(self)
-        self.preLEdit.setMinimum(1)
-        self.preLEdit.setMaximum(16)
-        self.preLEdit.move(300, 175)
+        self.preSBox = qwid.QSpinBox(self)
+        self.preSBox.setMinimum(1)
+        self.preSBox.setMaximum(16)
+        self.preSBox.move(300, 175)
 
-        self.pstLEdit = qwid.QSpinBox(self)
-        self.pstLEdit.setMinimum(1)
-        self.pstLEdit.setMaximum(16)
-        self.pstLEdit.move(300, 225)
+        self.pstSBox = qwid.QSpinBox(self)
+        self.pstSBox.setMinimum(1)
+        self.pstSBox.setMaximum(16)
+        self.pstSBox.move(300, 225)
 
         # Widgets to set tolerance
         tolLabel = qwid.QLabel("Enter tolerance for Gauss-Seidel", self)
@@ -124,6 +126,7 @@ class mainWindow(qwid.QMainWindow):
 
         # Start button
         startButton = qwid.QPushButton('Start', self)
+        startButton.clicked.connect(self.startSolver)
         startButton.resize(startButton.sizeHint())
         startButton.move(180, 440)
 
@@ -141,6 +144,22 @@ class mainWindow(qwid.QMainWindow):
     def gsCBoxSelection(self, i):
         maxDepth = i + 1
         self.vdSBox.setMaximum(i + 1)
+
+    def startSolver(self):
+        mgSolver.sInd = int(self.gsCBox.currentIndex()) + 2
+        mgSolver.VDepth = self.vdSBox.value()
+        mgSolver.vcCnt = self.vcSBox.value()
+        mgSolver.preSm = self.preSBox.value()
+        mgSolver.pstSm = self.pstSBox.value()
+        mgSolver.tolerance = float(self.tolLEdit.text())
+
+        self.createConsoleWindow()
+
+    def createConsoleWindow(self):
+        self.cWindow = qwid.QMdiSubWindow()
+        self.cWindow.setWidget(qwid.QTextEdit())
+        self.mdi.addSubWindow(self.cWindow)
+        self.cWindow.show()
 
     def closeEvent(self, event):
         reply = qwid.QMessageBox.question(self, 'Close Window', "Are you sure?", qwid.QMessageBox.Yes | qwid.QMessageBox.No, qwid.QMessageBox.No)

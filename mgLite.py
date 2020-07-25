@@ -59,30 +59,6 @@ pstSm = 3
 # Tolerance value for iterative solver
 tolerance = 1.0e-6
 
-############################### GLOBAL VARIABLES ################################
-
-# N should be of the form 2^n + 1
-# Then there will be 2^n + 3 points in total, including 2 ghost points
-sLst = [2**x + 1 for x in range(15)]
-
-# Get array of grid sizes corresponding to each level of V-Cycle
-N = sLst[sInd:sInd - VDepth - 1:-1]
-
-# Define array of grid spacings
-hx = [1.0/(x-1) for x in N]
-
-# Square of hx, used in finite difference formulae
-hx2 = [x*x for x in hx]
-
-# Maximum number of iterations while solving at coarsest level
-maxCount = 10*sLst[sInd]
-
-# Integer specifying the level of V-cycle at any point while solving
-vLev = 0
-
-# Flag to determine if non-zero homogenous BC has to be applied or not
-zeroBC = False
-
 
 ##################################### MAIN ######################################
 
@@ -90,6 +66,7 @@ zeroBC = False
 def main():
     global N
 
+    initGlobals()
     initDirichlet()
     initVariables()
 
@@ -97,7 +74,36 @@ def main():
     mgLHS = multigrid(mgRHS)
 
     computeError(mgLHS)
-    plotResult(mgLHS, 0)
+    #plotResult(mgLHS, 0)
+
+
+def initGlobals():
+    global N
+    global hx, hx2
+    global maxCount
+    global vLev, zeroBC
+
+    # N should be of the form 2^n + 1
+    # Then there will be 2^n + 3 points in total, including 2 ghost points
+    sLst = [2**x + 1 for x in range(15)]
+
+    # Get array of grid sizes corresponding to each level of V-Cycle
+    N = sLst[sInd:sInd - VDepth - 1:-1]
+
+    # Define array of grid spacings
+    hx = [1.0/(x-1) for x in N]
+
+    # Square of hx, used in finite difference formulae
+    hx2 = [x*x for x in hx]
+
+    # Maximum number of iterations while solving at coarsest level
+    maxCount = 10*sLst[sInd]
+
+    # Integer specifying the level of V-cycle at any point while solving
+    vLev = 0
+
+    # Flag to determine if non-zero homogenous BC has to be applied or not
+    zeroBC = False
 
 
 ############################## MULTI-GRID SOLVER ###############################
