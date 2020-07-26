@@ -73,15 +73,15 @@ class mainWindow(qwid.QMainWindow):
         self.vdSBox.move(300, 75)
 
         # Widgets to set vcCnt, preSm and pstSm
-        vcLabel = qwid.QLabel("Enter number of V-Cycles to be computed", self)
+        vcLabel = qwid.QLabel("Set number of V-Cycles to be computed", self)
         vcLabel.resize(vcLabel.sizeHint())
         vcLabel.move(30, 132)
 
-        preLabel = qwid.QLabel("Enter number pre-smoothing iterations", self)
+        preLabel = qwid.QLabel("Set number of pre-smoothing iterations", self)
         preLabel.resize(preLabel.sizeHint())
         preLabel.move(30, 182)
 
-        pstLabel = qwid.QLabel("Enter number post-smoothing iterations", self)
+        pstLabel = qwid.QLabel("Set number of post-smoothing iterations", self)
         pstLabel.resize(pstLabel.sizeHint())
         pstLabel.move(30, 232)
 
@@ -101,7 +101,7 @@ class mainWindow(qwid.QMainWindow):
         self.pstSBox.move(300, 225)
 
         # Widgets to set tolerance
-        tolLabel = qwid.QLabel("Enter tolerance for Gauss-Seidel", self)
+        tolLabel = qwid.QLabel("Enter tolerance for iterative solver", self)
         tolLabel.resize(tolLabel.sizeHint())
         tolLabel.move(30, 282)
 
