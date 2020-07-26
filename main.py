@@ -44,7 +44,7 @@ class mainWindow(qwid.QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.setFixedSize(450, 500)
+        self.setFixedSize(435, 500)
         self.initUI()
 
     def initUI(self):
@@ -150,10 +150,15 @@ class mainWindow(qwid.QMainWindow):
         mgSolver.vcCnt = self.vcSBox.value()
         mgSolver.preSm = self.preSBox.value()
         mgSolver.pstSm = self.pstSBox.value()
-        mgSolver.tolerance = float(self.tolLEdit.text())
+        try:
+            tolValue = float(self.tolLEdit.text())
+            mgSolver.tolerance = tolValue
 
-        self.cWindow = consoleWindow(self.solChBox, self.errChBox, self.conChBox)
-        self.cWindow.runSolver()
+            self.cWindow = consoleWindow(self.solChBox, self.errChBox, self.conChBox)
+            self.cWindow.runSolver()
+
+        except:
+            errDialog = qwid.QMessageBox.critical(self, 'Invalid Tolerance', "The value entered for tolerance is not a valid floating point number :(", qwid.QMessageBox.Ok)
 
     def closeEvent(self, event):
         reply = qwid.QMessageBox.question(self, 'Close Window', "Are you sure?", qwid.QMessageBox.Yes | qwid.QMessageBox.No, qwid.QMessageBox.No)
