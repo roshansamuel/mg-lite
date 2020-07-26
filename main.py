@@ -45,7 +45,6 @@ class mainWindow(qwid.QMainWindow):
         super().__init__()
 
         self.setFixedSize(450, 500)
-        self.mdi = qwid.QMdiArea()
         self.initUI()
 
     def initUI(self):
@@ -137,7 +136,7 @@ class mainWindow(qwid.QMainWindow):
         quitButton.move(300, 440)
 
         self.setWindowTitle('MG-Lite')
-        self.setWindowIcon(qgui.QIcon('vCycleMG.png'))
+        self.setWindowIcon(qgui.QIcon('icon.png'))
 
         self.show()
 
@@ -153,21 +152,79 @@ class mainWindow(qwid.QMainWindow):
         mgSolver.pstSm = self.pstSBox.value()
         mgSolver.tolerance = float(self.tolLEdit.text())
 
-        self.createConsoleWindow()
-
-    def createConsoleWindow(self):
-        self.cWindow = qwid.QMdiSubWindow()
-        self.cWindow.setWidget(qwid.QTextEdit())
-        self.mdi.addSubWindow(self.cWindow)
-        self.cWindow.show()
+        self.cWindow = consoleWindow(self.solChBox, self.errChBox, self.conChBox)
+        self.cWindow.runSolver()
 
     def closeEvent(self, event):
         reply = qwid.QMessageBox.question(self, 'Close Window', "Are you sure?", qwid.QMessageBox.Yes | qwid.QMessageBox.No, qwid.QMessageBox.No)
 
         if reply == qwid.QMessageBox.Yes:
+            try:
+                self.cWindow.close()
+            except:
+                pass
+
             event.accept()
         else:
             event.ignore()
+
+############################### CONSOLE WINDOW ##################################
+
+class consoleWindow(qwid.QMainWindow):
+    def __init__(self, sCBox, eCBox, rCBox):
+        super().__init__()
+
+        self.sPlot = sCBox.isChecked()
+        self.ePlot = eCBox.isChecked()
+        self.rPlot = rCBox.isChecked()
+
+        self.setFixedSize(400, 400)
+        self.initUI()
+
+    def initUI(self):
+        # Text edit box to output console stream
+        self.conTEdit = qwid.QTextEdit(self)
+        self.conTEdit.resize(340, 300)
+        self.conTEdit.move(30, 30)
+
+        # Plot button
+        plotButton = qwid.QPushButton('Plot', self)
+        plotButton.clicked.connect(self.plotSolution)
+        plotButton.resize(plotButton.sizeHint())
+        plotButton.move(165, 350)
+
+        if (self.sPlot or self.ePlot or self.rPlot):
+            plotButton.setEnabled(True)
+        else:
+            plotButton.setEnabled(False)
+
+        # Close button
+        closeButton = qwid.QPushButton('Close', self)
+        closeButton.clicked.connect(self.close)
+        closeButton.resize(closeButton.sizeHint())
+        closeButton.move(275, 350)
+
+        self.setWindowTitle('MG-Lite Console Output')
+        self.setWindowIcon(qgui.QIcon('icon.png'))
+
+        self.show()
+
+    def runSolver(self):
+        mgSolver.main(self)
+        qwid.QApplication.processEvents()
+
+    def updateTEdit(self, cOutString):
+        self.conTEdit.append(cOutString)
+        qwid.QApplication.processEvents()
+
+    def plotSolution(self):
+        if self.sPlot:
+            mgSolver.plotResult(0)
+        if self.ePlot:
+            mgSolver.plotResult(1)
+        if self.rPlot:
+            mgSolver.plotResult(2)
+
 
 ############################## THAT'S IT, FOLKS!! ###############################
 

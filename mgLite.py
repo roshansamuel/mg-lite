@@ -34,6 +34,7 @@
 # Import all necessary modules
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
 
 ################################ GRID CONSTANTS #################################
 
@@ -63,18 +64,20 @@ tolerance = 1.0e-6
 ##################################### MAIN ######################################
 
 
-def main():
+def main(oConsole):
     global N
+    global qtConsole
 
     initGlobals()
     initDirichlet()
     initVariables()
 
+    qtConsole = oConsole
+
     mgRHS = np.ones(N[0] + 2)
     mgLHS = multigrid(mgRHS)
 
     computeError(mgLHS)
-    #plotResult(mgLHS, 0)
 
 
 def initGlobals():
@@ -113,19 +116,25 @@ def initGlobals():
 def multigrid(H):
     global N
     global vcCnt
+    global rConv
+    global qtConsole
     global pData, rData
 
     n = N[0]
     rData[0] = H[1:-1]
     chMat = np.zeros(n)
+    rConv = np.zeros(vcCnt)
 
     for i in range(vcCnt):
-        v_cycle()
+        cycleFail = v_cycle()
+        if cycleFail:
+            break
 
         chMat = laplace(pData[0])
         resVal = np.amax(np.abs(H[1:n+1] - chMat))
+        rConv[i] = resVal
 
-        print("Residual after V-Cycle {0:2d} is {1:.4e}".format(i+1, resVal))
+        qtConsole.updateTEdit("Residual after V-Cycle {0:2d} is {1:.4e}\n".format(i+1, resVal))
 
     return pData[0]
 
@@ -158,7 +167,9 @@ def v_cycle():
 
         # If the coarsest level is reached, solve. Otherwise, keep smoothing!
         if vLev == VDepth:
-            solve()
+            solveFail = solve()
+            if solveFail:
+                return 1
         else:
             smooth(preSm)
 
@@ -178,6 +189,8 @@ def v_cycle():
 
         # Post-smoothing
         smooth(pstSm)
+
+    return 0
 
 
 # Smoothens the solution sCount times using Gauss-Seidel smoother
@@ -227,6 +240,7 @@ def solve():
     global N, hx2
     global maxCount
     global tolerance
+    global qtConsole
     global pData, rData
 
     n = N[vLev]
@@ -246,10 +260,12 @@ def solve():
 
         jCnt += 1
         if jCnt > maxCount:
-            print("MAYDAY! Iterative solver refuses to converge.")
-            quit()
+            qtConsole.updateTEdit("MAYDAY! Iterative solver refuses to converge.\n")
+            return 1
 
     imposeBC(pData[vLev])
+
+    return 0
 
 
 # Increases the size of the array to a higher level, 2^(n + 1) + 1
@@ -339,30 +355,35 @@ def initDirichlet():
 # Compute the error in pSoln w.r.t the analytical solution
 def computeError(pSoln):
     global pAnlt
+    global qtConsole
 
     pErr = pAnlt[1:-1] - pSoln[1:-1]
     errVal = np.amax(pErr)
 
-    print("\nError in solution after this endeavour is {0:.4e}".format(errVal))
+    qtConsole.updateTEdit("Error in solution after this endeavour is {0:.4e}".format(errVal))
 
 
 ############################### PLOTTING ROUTINE ################################
 
 
-# Surprise! This function.... plots! It plots pSoln according to the plotType
+# Surprise! This function.... plots!
 # plotType = 0: Plot computed and analytic solution together
 # plotType = 1: Plot error in computed solution w.r.t. analytic solution
+# plotType = 2: Plot convergence of residual against V-Cycles
 # Any other value of plotType, and the function will barf.
-def plotResult(pSoln, plotType):
+def plotResult(plotType):
     global N
     global pAnlt
+    global pData
+    global rConv
 
     plt.rcParams["font.family"] = "Times New Roman"
     plt.rcParams["mathtext.fontset"] = 'cm'
     plt.rcParams["font.weight"] = "medium"
 
-    plt.figure(figsize=(14,10))
+    plt.figure(figsize=(13, 9))
 
+    pSoln = pData[0]
     x = np.linspace(0.0, 1.0, N[0])
     if plotType == 0:
         plt.plot(x, pAnlt[1:-1], label='Analytic', marker='*', markersize=20, linewidth=4)
@@ -371,24 +392,24 @@ def plotResult(pSoln, plotType):
         plt.ylabel('p', fontsize=40)
 
     elif plotType == 1:
-        pErr = pAnlt[1:-1] - pSoln[1:-1]
+        pErr = np.abs(pAnlt[1:-1] - pSoln[1:-1])
         plt.semilogy(x, pErr, label='Error', marker='*', markersize=20, linewidth=4)
         plt.xlabel('x', fontsize=40)
         plt.ylabel('e_p', fontsize=40)
 
-    else:
-        print("\nSomething is fishy with the arguments to plotting function")
-        exit()
+    elif plotType == 2:
+        vcAxis = np.arange(len(rConv)) + 1
+        plt.semilogy(vcAxis, rConv, label='Residual', marker='*', markersize=20, linewidth=4)
+        plt.xlabel('V-Cycles', fontsize=40)
+        plt.ylabel('Residual', fontsize=40)
+
+        axes = plt.gca()
+        axes.yaxis.set_major_locator(MaxNLocator(integer=True))
 
     plt.xticks(fontsize=30)
     plt.yticks(fontsize=30)
     plt.legend(fontsize=40)
     plt.show()
 
-
 ############################## THAT'S IT, FOLKS!! ###############################
-
-
-if __name__ == "__main__":
-    main()
 
