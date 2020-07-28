@@ -48,7 +48,7 @@ class mainWindow(qwid.QMainWindow):
         self.initUI()
 
     def initUI(self):
-        # Widgets to get and set sInd
+        # Widgets to set grid size
         gsLabel = qwid.QLabel("Select number of points in domain", self)
         gsLabel.resize(gsLabel.sizeHint())
         gsLabel.move(30, 32)
@@ -61,8 +61,8 @@ class mainWindow(qwid.QMainWindow):
         self.gsCBox.currentIndexChanged.connect(self.gsCBoxSelection)
         self.gsCBox.move(300, 25)
 
-        # Widgets to get and set VDepth
-        vdLabel = qwid.QLabel("Set depth for multi-grid V-Cycles", self)
+        # Widgets to set depth of V-Cycles
+        vdLabel = qwid.QLabel("Set depth of multi-grid V-Cycles", self)
         vdLabel.resize(vdLabel.sizeHint())
         vdLabel.move(30, 82)
 
@@ -72,35 +72,38 @@ class mainWindow(qwid.QMainWindow):
         self.vdSBox.setMaximum(1)
         self.vdSBox.move(300, 75)
 
-        # Widgets to set vcCnt, preSm and pstSm
+        # Widgets to set number of V-Cycles
         vcLabel = qwid.QLabel("Set number of V-Cycles to be computed", self)
         vcLabel.resize(vcLabel.sizeHint())
         vcLabel.move(30, 132)
-
-        preLabel = qwid.QLabel("Set number of pre-smoothing iterations", self)
-        preLabel.resize(preLabel.sizeHint())
-        preLabel.move(30, 182)
-
-        pstLabel = qwid.QLabel("Set number of post-smoothing iterations", self)
-        pstLabel.resize(pstLabel.sizeHint())
-        pstLabel.move(30, 232)
 
         self.vcSBox = qwid.QSpinBox(self)
         self.vcSBox.setMinimum(1)
         self.vcSBox.setMaximum(32)
         self.vcSBox.move(300, 125)
+        self.vcSBox.valueChanged.connect(self.vcCountCheck)
+
+        # Widgets to set number of pre-smoothing iterations
+        preLabel = qwid.QLabel("Set number of pre-smoothing iterations", self)
+        preLabel.resize(preLabel.sizeHint())
+        preLabel.move(30, 182)
 
         self.preSBox = qwid.QSpinBox(self)
         self.preSBox.setMinimum(1)
         self.preSBox.setMaximum(16)
         self.preSBox.move(300, 175)
 
+        # Widgets to set number of post-smoothing iterations
+        pstLabel = qwid.QLabel("Set number of post-smoothing iterations", self)
+        pstLabel.resize(pstLabel.sizeHint())
+        pstLabel.move(30, 232)
+
         self.pstSBox = qwid.QSpinBox(self)
         self.pstSBox.setMinimum(1)
         self.pstSBox.setMaximum(16)
         self.pstSBox.move(300, 225)
 
-        # Widgets to set tolerance
+        # Widgets to set tolerance for iterative solver
         tolLabel = qwid.QLabel("Enter tolerance for iterative solver", self)
         tolLabel.resize(tolLabel.sizeHint())
         tolLabel.move(30, 282)
@@ -110,7 +113,7 @@ class mainWindow(qwid.QMainWindow):
         self.tolLEdit.setAlignment(qcore.Qt.AlignRight)
         self.tolLEdit.move(300, 275)
 
-        # Widgets to decide what should be plotted
+        # A few check boxes to decide what should be plotted
         self.solChBox = qwid.QCheckBox("Plot computed and analytical solution", self)
         self.solChBox.resize(self.solChBox.sizeHint())
         self.solChBox.move(30, 332)
@@ -121,29 +124,47 @@ class mainWindow(qwid.QMainWindow):
 
         self.conChBox = qwid.QCheckBox("Plot convergence of residual", self)
         self.conChBox.resize(self.conChBox.sizeHint())
+        self.conChBox.setToolTip("To plot residual convergence, we need at least 3 V-Cycles")
+        self.conChBox.setEnabled(False)
         self.conChBox.move(30, 392)
 
-        # Start button
+        # Start button - to start the simulation :)
         startButton = qwid.QPushButton('Start', self)
         startButton.clicked.connect(self.startSolver)
         startButton.resize(startButton.sizeHint())
         startButton.move(180, 440)
 
-        # Quit button
+        # Quit button - to quit the program :(
         quitButton = qwid.QPushButton('Quit', self)
         quitButton.clicked.connect(self.close)
         quitButton.resize(quitButton.sizeHint())
         quitButton.move(300, 440)
 
+        # Window title and icon
         self.setWindowTitle('MG-Lite')
         self.setWindowIcon(qgui.QIcon('icon.png'))
 
+        # Reveal thyself
         self.show()
 
+    # This function restricts the maximum value in the SpinBox to set V-Cycle depth
+    # according to the grid size
     def gsCBoxSelection(self, i):
         maxDepth = i + 1
         self.vdSBox.setMaximum(i + 1)
 
+    # This function enables or disables the CheckBox to plot convergence of resiudal
+    # according to the number of V-Cycles computed.
+    # It makes no sense to plot convergence for less than 3 V-Cycles
+    def vcCountCheck(self):
+        if self.vcSBox.value() > 2:
+            self.conChBox.setEnabled(True)
+        else:
+            self.conChBox.setEnabled(False)
+
+    # This function interfaces with the multi-grid solver and sets the parameters
+    # according to the inputs given in the window.
+    # It then opens the console window and hands the baton to it.
     def startSolver(self):
         mgSolver.sInd = int(self.gsCBox.currentIndex()) + 2
         mgSolver.VDepth = self.vdSBox.value()
@@ -160,6 +181,7 @@ class mainWindow(qwid.QMainWindow):
         except:
             errDialog = qwid.QMessageBox.critical(self, 'Invalid Tolerance', "The value entered for tolerance is not a valid floating point number :(", qwid.QMessageBox.Ok)
 
+    # Clingy function for a clingy app - makes sure that the user wants to quit the app
     def closeEvent(self, event):
         reply = qwid.QMessageBox.question(self, 'Close Window', "Are you sure?", qwid.QMessageBox.Yes | qwid.QMessageBox.No, qwid.QMessageBox.No)
 
@@ -179,6 +201,7 @@ class consoleWindow(qwid.QMainWindow):
     def __init__(self, sCBox, eCBox, rCBox):
         super().__init__()
 
+        # Three boolean flags for the three check boxes for plots in the main window
         self.sPlot = sCBox.isChecked()
         self.ePlot = eCBox.isChecked()
         self.rPlot = rCBox.isChecked()
@@ -187,7 +210,7 @@ class consoleWindow(qwid.QMainWindow):
         self.initUI()
 
     def initUI(self):
-        # Text edit box to output console stream
+        # Text box to output console stream
         self.conTEdit = qwid.QTextEdit(self)
         self.conTEdit.resize(340, 300)
         self.conTEdit.move(30, 30)
@@ -198,6 +221,7 @@ class consoleWindow(qwid.QMainWindow):
         plotButton.resize(plotButton.sizeHint())
         plotButton.move(165, 350)
 
+        # The plot button will be disabled if none of the check boxes in main window are checked
         if (self.sPlot or self.ePlot or self.rPlot):
             plotButton.setEnabled(True)
         else:
@@ -209,19 +233,27 @@ class consoleWindow(qwid.QMainWindow):
         closeButton.resize(closeButton.sizeHint())
         closeButton.move(275, 350)
 
+        # Window title and icon
         self.setWindowTitle('MG-Lite Console Output')
         self.setWindowIcon(qgui.QIcon('icon.png'))
 
+        # Reveal thyself
         self.show()
 
+    # As the function name says, it calls the main() of the MG solver
     def runSolver(self):
         mgSolver.main(self)
         qwid.QApplication.processEvents()
 
+    # This function is called by the MG solver at all places where it normally used the print()
+    # command. The string passed to the print command is instead passed to this function,
+    # which sends it to the text box of the console window.
     def updateTEdit(self, cOutString):
         self.conTEdit.append(cOutString)
         qwid.QApplication.processEvents()
 
+    # This function is called by the 'Plot' button when clicked.
+    # It merely calls the plotResult() function of the MG solver, with appropriate arguments.
     def plotSolution(self):
         if self.sPlot:
             mgSolver.plotResult(0)

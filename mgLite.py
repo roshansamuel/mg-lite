@@ -36,14 +36,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
-################################ GRID CONSTANTS #################################
+############################### GLOBAL CONSTANTS ################################
+
+# All the values set below are merely default values.
+# They will be overwritten by the GUI with values specified by the user
+# when the 'Start' button in its main window is clicked.
 
 # Choose grid size as an index from below list
 # Size index: 0 1 2 3  4  5  6  7   8   9   10   11   12   13    14
 # Grid sizes: 2 3 5 9 17 33 65 129 257 513 1025 2049 4097 8193 16385
 sInd = 7
-
-############################# MULTI-GRID CONSTANTS ##############################
 
 # Depth of each V-cycle in multigrid (ideally VDepth = sInd - 1)
 VDepth = 6
@@ -60,9 +62,7 @@ pstSm = 3
 # Tolerance value for iterative solver
 tolerance = 1.0e-6
 
-
 ##################################### MAIN ######################################
-
 
 def main(oConsole):
     global N
@@ -370,7 +370,7 @@ def computeError(pSoln):
 # plotType = 0: Plot computed and analytic solution together
 # plotType = 1: Plot error in computed solution w.r.t. analytic solution
 # plotType = 2: Plot convergence of residual against V-Cycles
-# Any other value of plotType, and the function will barf.
+# Any other value for plotType, and the function will barf.
 def plotResult(plotType):
     global N
     global pAnlt
@@ -404,7 +404,7 @@ def plotResult(plotType):
         plt.ylabel('Residual', fontsize=40)
 
         axes = plt.gca()
-        axes.yaxis.set_major_locator(MaxNLocator(integer=True))
+        axes.xaxis.set_major_locator(MaxNLocator(integer=True))
 
     plt.xticks(fontsize=30)
     plt.yticks(fontsize=30)
