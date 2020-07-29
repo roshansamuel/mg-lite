@@ -161,6 +161,7 @@ class mainWindow(qwid.QMainWindow):
             self.conChBox.setEnabled(True)
         else:
             self.conChBox.setEnabled(False)
+            self.conChBox.setChecked(False)
 
     # This function interfaces with the multi-grid solver and sets the parameters
     # according to the inputs given in the window.
