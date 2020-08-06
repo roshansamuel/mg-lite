@@ -47,6 +47,9 @@ from matplotlib.ticker import MaxNLocator
 # Grid sizes: 2 3 5 9 17 33 65 129 257 513 1025 2049 4097 8193 16385
 sInd = 7
 
+# Stretching parameter for tangent-hyperbolic grid, 0 defaults to uniform grid
+beta = 0.0
+
 # Depth of each V-cycle in multigrid (ideally VDepth = sInd - 1)
 VDepth = 6
 
@@ -69,8 +72,11 @@ def main(oConsole):
     global qtConsole
 
     initGlobals()
-    initDirichlet()
     initVariables()
+
+    initGrid()
+
+    initDirichlet()
 
     qtConsole = oConsole
 
@@ -134,7 +140,10 @@ def multigrid(H):
         resVal = np.amax(np.abs(H[1:n+1] - chMat))
         rConv[i] = resVal
 
-        qtConsole.updateTEdit("Residual after V-Cycle {0:2d} is {1:.4e}\n".format(i+1, resVal))
+        if qtConsole:
+            qtConsole.updateTEdit("Residual after V-Cycle {0:2d} is {1:.4e}\n".format(i+1, resVal))
+        else:
+            print("Residual after V-Cycle {0:2d} is {1:.4e}\n".format(i+1, resVal))
 
     return pData[0]
 
@@ -198,6 +207,7 @@ def smooth(sCount):
     global N
     global hx2
     global vLev
+    global xixx, xix2
     global rData, pData
 
     n = N[vLev]
@@ -206,7 +216,15 @@ def smooth(sCount):
 
         # Gauss-Seidel smoothing
         for j in range(1, n+1):
+            pData[vLev][j] = (xix2[vLev][j-1]*(pData[vLev][j+1] + pData[vLev][j-1])*2.0 +
+                              xixx[vLev][j-1]*(pData[vLev][j+1] - pData[vLev][j-1])*hx[vLev] -
+                             rData[vLev][j-1]*2.0*hx2[vLev]) / (4.0*xix2[vLev][j-1])
+
+        '''
+        # Gauss-Seidel smoothing
+        for j in range(1, n+1):
             pData[vLev][j] = (pData[vLev][j+1] + pData[vLev][j-1] - hx2[vLev]*rData[vLev][j-1])*0.5
+        '''
 
     imposeBC(pData[vLev])
 
@@ -252,7 +270,15 @@ def solve():
 
         # Gauss-Seidel iterative solver
         for i in range(1, n+1):
+            pData[vLev][i] = (xix2[vLev][i-1]*(pData[vLev][i+1] + pData[vLev][i-1])*2.0 +
+                              xixx[vLev][i-1]*(pData[vLev][i+1] - pData[vLev][i-1])*hx[vLev] -
+                             rData[vLev][i-1]*2.0*hx2[vLev]) / (4.0*xix2[vLev][i-1])
+
+        '''
+        # Gauss-Seidel iterative solver
+        for i in range(1, n+1):
             pData[vLev][i] = (pData[vLev][i+1] + pData[vLev][i-1] - hx2[vLev]*rData[vLev][i-1])*0.5
+        '''
 
         maxErr = np.amax(np.abs(rData[vLev] - laplace(pData[vLev])))
         if maxErr < tolerance:
@@ -260,7 +286,10 @@ def solve():
 
         jCnt += 1
         if jCnt > maxCount:
-            qtConsole.updateTEdit("MAYDAY! Iterative solver refuses to converge.\n")
+            if qtConsole:
+                qtConsole.updateTEdit("MAYDAY! Iterative solver refuses to converge.\n")
+            else:
+                print("MAYDAY! Iterative solver refuses to converge.\n")
             return 1
 
     imposeBC(pData[vLev])
@@ -289,11 +318,17 @@ def prolong():
 def laplace(function):
     global vLev
     global N, hx2
+    global xixx, xix2
 
     n = N[vLev]
 
     gradient = np.zeros(n)
-    gradient = (function[:n] - 2.0*function[1:n+1] + function[2:])/hx2[vLev]
+    '''
+    gradient = (function[2:] - 2.0*function[1:n+1] + function[:n]) / hx2[vLev]
+    '''
+
+    gradient = xix2[vLev]*(function[2:] - 2.0*function[1:n+1] + function[:n]) / hx2[vLev] + \
+               xixx[vLev]*(function[2:] - function[:n]) / (2.0*hx[vLev])
 
     return gradient
 
@@ -310,6 +345,28 @@ def initVariables():
 
     sData = [np.zeros_like(x) for x in pData]
     iTemp = [np.zeros_like(x) for x in pData]
+
+
+# Initialize the grid. This is relevant only for non-uniform grids
+def initGrid():
+    global N
+    global beta
+    global xi_x, xixx, xix2
+
+    # Uniform grid default values
+    x = [np.linspace(0.0, 1.0, n) for n in N]
+    xi = [np.linspace(0.0, 1.0, n) for n in N]
+
+    xi_x = [np.ones_like(i) for i in xi]
+    xix2 = [np.ones_like(i) for i in xi]
+    xixx = [np.zeros_like(i) for i in xi]
+
+    if beta:
+        for n in N:
+            x = [(1.0 - np.tanh(beta*(1.0 - 2.0*i))/np.tanh(beta))/2.0 for i in xi]
+            xi_x = np.array([np.tanh(beta)/(beta*(1.0 - ((1.0 - 2.0*k)*np.tanh(beta))**2.0)) for k in x])
+            xixx = np.array([-4.0*(np.tanh(beta)**3.0)*(1.0 - 2.0*k)/(beta*(1.0 - (np.tanh(beta)*(1.0 - 2.0*k)**2.0)**2.0)) for k in x])
+            xix2 = np.array([k*k for k in xi_x])
 
 
 ############################## BOUNDARY CONDITION ###############################
@@ -360,7 +417,10 @@ def computeError(pSoln):
     pErr = pAnlt[1:-1] - pSoln[1:-1]
     errVal = np.amax(pErr)
 
-    qtConsole.updateTEdit("Error in solution after this endeavour is {0:.4e}".format(errVal))
+    if qtConsole:
+        qtConsole.updateTEdit("Error in solution after this endeavour is {0:.4e}".format(errVal))
+    else:
+        print("Error in solution after this endeavour is {0:.4e}".format(errVal))
 
 
 ############################### PLOTTING ROUTINE ################################
@@ -412,4 +472,7 @@ def plotResult(plotType):
     plt.show()
 
 ############################## THAT'S IT, FOLKS!! ###############################
+
+if __name__ == '__main__':
+    main(False)
 
