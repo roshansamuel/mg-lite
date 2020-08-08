@@ -48,7 +48,7 @@ from matplotlib.ticker import MaxNLocator
 sInd = 7
 
 # Stretching parameter for tangent-hyperbolic grid, 0 defaults to uniform grid
-beta = 0.0
+beta = 1.0
 
 # Depth of each V-cycle in multigrid (ideally VDepth = sInd - 1)
 VDepth = 6
@@ -84,10 +84,14 @@ def main(oConsole):
     mgLHS = multigrid(mgRHS)
 
     computeError(mgLHS)
+    plotResult(0)
 
 
 def initGlobals():
     global N
+    global beta
+    global VDepth
+    global ugFlag
     global hx, hx2
     global maxCount
     global vLev, zeroBC
@@ -113,6 +117,11 @@ def initGlobals():
 
     # Flag to determine if non-zero homogenous BC has to be applied or not
     zeroBC = False
+
+    # Set flag to switch between uniform and non-uniform grid calculations
+    ugFlag = True
+    if beta:
+        ugFlag = False
 
 
 ############################## MULTI-GRID SOLVER ###############################
@@ -207,6 +216,7 @@ def smooth(sCount):
     global N
     global hx2
     global vLev
+    global ugFlag
     global xixx, xix2
     global rData, pData
 
@@ -215,16 +225,16 @@ def smooth(sCount):
         imposeBC(pData[vLev])
 
         # Gauss-Seidel smoothing
-        for j in range(1, n+1):
-            pData[vLev][j] = (xix2[vLev][j-1]*(pData[vLev][j+1] + pData[vLev][j-1])*2.0 +
-                              xixx[vLev][j-1]*(pData[vLev][j+1] - pData[vLev][j-1])*hx[vLev] -
-                             rData[vLev][j-1]*2.0*hx2[vLev]) / (4.0*xix2[vLev][j-1])
-
-        '''
-        # Gauss-Seidel smoothing
-        for j in range(1, n+1):
-            pData[vLev][j] = (pData[vLev][j+1] + pData[vLev][j-1] - hx2[vLev]*rData[vLev][j-1])*0.5
-        '''
+        if ugFlag:
+            # For uniform grid
+            for j in range(1, n+1):
+                pData[vLev][j] = (pData[vLev][j+1] + pData[vLev][j-1] - hx2[vLev]*rData[vLev][j-1])*0.5
+        else:
+            # For non-uniform grid
+            for j in range(1, n+1):
+                pData[vLev][j] = (xix2[vLev][j-1]*(pData[vLev][j+1] + pData[vLev][j-1])*2.0 +
+                                  xixx[vLev][j-1]*(pData[vLev][j+1] - pData[vLev][j-1])*hx[vLev] -
+                                 rData[vLev][j-1]*2.0*hx2[vLev]) / (4.0*xix2[vLev][j-1])
 
     imposeBC(pData[vLev])
 
@@ -255,6 +265,7 @@ def restrict():
 # Solves at coarsest level using an iterative solver
 def solve():
     global vLev
+    global ugFlag
     global N, hx2
     global maxCount
     global tolerance
@@ -269,16 +280,16 @@ def solve():
         imposeBC(pData[vLev])
 
         # Gauss-Seidel iterative solver
-        for i in range(1, n+1):
-            pData[vLev][i] = (xix2[vLev][i-1]*(pData[vLev][i+1] + pData[vLev][i-1])*2.0 +
-                              xixx[vLev][i-1]*(pData[vLev][i+1] - pData[vLev][i-1])*hx[vLev] -
-                             rData[vLev][i-1]*2.0*hx2[vLev]) / (4.0*xix2[vLev][i-1])
-
-        '''
-        # Gauss-Seidel iterative solver
-        for i in range(1, n+1):
-            pData[vLev][i] = (pData[vLev][i+1] + pData[vLev][i-1] - hx2[vLev]*rData[vLev][i-1])*0.5
-        '''
+        if ugFlag:
+            # For uniform grid
+            for i in range(1, n+1):
+                pData[vLev][i] = (pData[vLev][i+1] + pData[vLev][i-1] - hx2[vLev]*rData[vLev][i-1])*0.5
+        else:
+            # For non-uniform grid
+            for i in range(1, n+1):
+                pData[vLev][i] = (xix2[vLev][i-1]*(pData[vLev][i+1] + pData[vLev][i-1])*2.0 +
+                                  xixx[vLev][i-1]*(pData[vLev][i+1] - pData[vLev][i-1])*hx[vLev] -
+                                 rData[vLev][i-1]*2.0*hx2[vLev]) / (4.0*xix2[vLev][i-1])
 
         maxErr = np.amax(np.abs(rData[vLev] - laplace(pData[vLev])))
         if maxErr < tolerance:
@@ -317,18 +328,18 @@ def prolong():
 # Computes the 1D laplacian of function
 def laplace(function):
     global vLev
+    global ugFlag
     global N, hx2
     global xixx, xix2
 
     n = N[vLev]
 
     gradient = np.zeros(n)
-    '''
-    gradient = (function[2:] - 2.0*function[1:n+1] + function[:n]) / hx2[vLev]
-    '''
-
-    gradient = xix2[vLev]*(function[2:] - 2.0*function[1:n+1] + function[:n]) / hx2[vLev] + \
-               xixx[vLev]*(function[2:] - function[:n]) / (2.0*hx[vLev])
+    if ugFlag:
+        gradient = (function[2:] - 2.0*function[1:n+1] + function[:n]) / hx2[vLev]
+    else:
+        gradient = xix2[vLev]*(function[2:] - 2.0*function[1:n+1] + function[:n]) / hx2[vLev] + \
+                   xixx[vLev]*(function[2:] - function[:n]) / (2.0*hx[vLev])
 
     return gradient
 
@@ -351,22 +362,31 @@ def initVariables():
 def initGrid():
     global N
     global beta
-    global xi_x, xixx, xix2
+    global ugFlag
+    global xPts, xixx, xix2
 
     # Uniform grid default values
-    x = [np.linspace(0.0, 1.0, n) for n in N]
     xi = [np.linspace(0.0, 1.0, n) for n in N]
-
     xi_x = [np.ones_like(i) for i in xi]
     xix2 = [np.ones_like(i) for i in xi]
     xixx = [np.zeros_like(i) for i in xi]
 
-    if beta:
-        for n in N:
-            x = [(1.0 - np.tanh(beta*(1.0 - 2.0*i))/np.tanh(beta))/2.0 for i in xi]
-            xi_x = np.array([np.tanh(beta)/(beta*(1.0 - ((1.0 - 2.0*k)*np.tanh(beta))**2.0)) for k in x])
-            xixx = np.array([-4.0*(np.tanh(beta)**3.0)*(1.0 - 2.0*k)/(beta*(1.0 - (np.tanh(beta)*(1.0 - 2.0*k)**2.0)**2.0)) for k in x])
-            xix2 = np.array([k*k for k in xi_x])
+    xPts = [np.linspace(-1.0/(n-1), 1.0 + 1.0/(n-1), n + 2) for n in N]
+
+    if not ugFlag:
+        xPts[0][1:-1] = np.array([(1.0 - np.tanh(beta*(1.0 - 2.0*i))/np.tanh(beta))/2.0 for i in xi[0]])
+        xi_x[0] = np.array([np.tanh(beta)/(beta*(1.0 - ((1.0 - 2.0*k)*np.tanh(beta))**2.0)) for k in xPts[0][1:-1]])
+        xixx[0] = np.array([-4.0*(np.tanh(beta)**3.0)*(1.0 - 2.0*k)/(beta*(1.0 - (np.tanh(beta)*(1.0 - 2.0*k)**2.0)**2.0)) for k in xPts[0][1:-1]])
+        xix2[0] = np.array([k*k for k in xi_x[0]])
+
+        xPts[0][0] = -xPts[0][2]
+        xPts[0][-1] = 1.0 + xPts[0][2]
+
+        for i in range(1, VDepth+1):
+            xPts[i][1:-1] = xPts[i-1][1:-1:2]
+            xi_x[i] = xi_x[i-1][::2]
+            xixx[i] = xixx[i-1][::2]
+            xix2[i] = xix2[i-1][::2]
 
 
 ############################## BOUNDARY CONDITION ###############################
@@ -395,18 +415,18 @@ def imposeBC(P):
 def initDirichlet():
     global N
     global hx
+    global xPts
     global pWall, pAnlt
 
     # Compute analytical solution, (r^2)/2
-    pAnlt = np.zeros(N[0] + 2)
+    pAnlt = np.zeros(N[0])
 
-    halfIndX = int(N[0]/2) + 1
-    for i in range(N[0] + 2):
-        xDist = hx[0]*(i - halfIndX)
+    for i in range(N[0]):
+        xDist = xPts[0][i+1] - 0.5
         pAnlt[i] = xDist*xDist/2.0
 
     # Value of P at wall according to analytical solution
-    pWall = pAnlt[1]
+    pWall = pAnlt[0]
 
 
 # Compute the error in pSoln w.r.t the analytical solution
@@ -414,7 +434,7 @@ def computeError(pSoln):
     global pAnlt
     global qtConsole
 
-    pErr = pAnlt[1:-1] - pSoln[1:-1]
+    pErr = pAnlt - pSoln[1:-1]
     errVal = np.amax(pErr)
 
     if qtConsole:
@@ -446,13 +466,13 @@ def plotResult(plotType):
     pSoln = pData[0]
     x = np.linspace(0.0, 1.0, N[0])
     if plotType == 0:
-        plt.plot(x, pAnlt[1:-1], label='Analytic', marker='*', markersize=20, linewidth=4)
+        plt.plot(x, pAnlt, label='Analytic', marker='*', markersize=20, linewidth=4)
         plt.plot(x, pSoln[1:-1], label='Computed', marker='+', markersize=20, linewidth=4)
         plt.xlabel('x', fontsize=40)
         plt.ylabel('p', fontsize=40)
 
     elif plotType == 1:
-        pErr = np.abs(pAnlt[1:-1] - pSoln[1:-1])
+        pErr = np.abs(pAnlt - pSoln[1:-1])
         plt.semilogy(x, pErr, label='Error', marker='*', markersize=20, linewidth=4)
         plt.xlabel('x', fontsize=40)
         plt.ylabel('e_p', fontsize=40)
