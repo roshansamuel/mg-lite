@@ -366,24 +366,20 @@ def initGrid():
     global xPts, xixx, xix2
 
     # Uniform grid default values
-    xi = [np.linspace(0.0, 1.0, n) for n in N]
-    xi_x = [np.ones_like(i) for i in xi]
-    xix2 = [np.ones_like(i) for i in xi]
-    xixx = [np.zeros_like(i) for i in xi]
-
-    xPts = [np.linspace(-1.0/(n-1), 1.0 + 1.0/(n-1), n + 2) for n in N]
+    xPts = [np.linspace(0.0, 1.0, n) for n in N]
+    xi_x = [np.ones_like(i) for i in xPts]
+    xix2 = [np.ones_like(i) for i in xPts]
+    xixx = [np.zeros_like(i) for i in xPts]
 
     if not ugFlag:
-        xPts[0][1:-1] = np.array([(1.0 - np.tanh(beta*(1.0 - 2.0*i))/np.tanh(beta))/2.0 for i in xi[0]])
-        xi_x[0] = np.array([np.tanh(beta)/(beta*(1.0 - ((1.0 - 2.0*k)*np.tanh(beta))**2.0)) for k in xPts[0][1:-1]])
-        xixx[0] = np.array([-4.0*(np.tanh(beta)**3.0)*(1.0 - 2.0*k)/(beta*(1.0 - (np.tanh(beta)*(1.0 - 2.0*k)**2.0)**2.0)) for k in xPts[0][1:-1]])
+        xi = np.linspace(0.0, 1.0, N[0])
+        xPts[0] = np.array([(1.0 - np.tanh(beta*(1.0 - 2.0*i))/np.tanh(beta))/2.0 for i in xi])
+        xi_x[0] = np.array([np.tanh(beta)/(beta*(1.0 - ((1.0 - 2.0*k)*np.tanh(beta))**2.0)) for k in xPts[0]])
+        xixx[0] = np.array([-4.0*(np.tanh(beta)**3.0)*(1.0 - 2.0*k)/(beta*(1.0 - (np.tanh(beta)*(1.0 - 2.0*k))**2.0)**2.0) for k in xPts[0]])
         xix2[0] = np.array([k*k for k in xi_x[0]])
 
-        xPts[0][0] = -xPts[0][2]
-        xPts[0][-1] = 1.0 + xPts[0][2]
-
         for i in range(1, VDepth+1):
-            xPts[i][1:-1] = xPts[i-1][1:-1:2]
+            xPts[i] = xPts[i-1][::2]
             xi_x[i] = xi_x[i-1][::2]
             xixx[i] = xixx[i-1][::2]
             xix2[i] = xix2[i-1][::2]
@@ -422,7 +418,7 @@ def initDirichlet():
     pAnlt = np.zeros(N[0])
 
     for i in range(N[0]):
-        xDist = xPts[0][i+1] - 0.5
+        xDist = xPts[0][i] - 0.5
         pAnlt[i] = xDist*xDist/2.0
 
     # Value of P at wall according to analytical solution
@@ -453,6 +449,7 @@ def computeError(pSoln):
 # Any other value for plotType, and the function will barf.
 def plotResult(plotType):
     global N
+    global xPts
     global pAnlt
     global pData
     global rConv
@@ -464,16 +461,15 @@ def plotResult(plotType):
     plt.figure(figsize=(13, 9))
 
     pSoln = pData[0]
-    x = np.linspace(0.0, 1.0, N[0])
     if plotType == 0:
-        plt.plot(x, pAnlt, label='Analytic', marker='*', markersize=20, linewidth=4)
-        plt.plot(x, pSoln[1:-1], label='Computed', marker='+', markersize=20, linewidth=4)
+        plt.plot(xPts[0], pAnlt, label='Analytic', marker='*', markersize=20, linewidth=4)
+        plt.plot(xPts[0], pSoln[1:-1], label='Computed', marker='+', markersize=20, linewidth=4)
         plt.xlabel('x', fontsize=40)
         plt.ylabel('p', fontsize=40)
 
     elif plotType == 1:
         pErr = np.abs(pAnlt - pSoln[1:-1])
-        plt.semilogy(x, pErr, label='Error', marker='*', markersize=20, linewidth=4)
+        plt.semilogy(xPts[0], pErr, label='Error', marker='*', markersize=20, linewidth=4)
         plt.xlabel('x', fontsize=40)
         plt.ylabel('e_p', fontsize=40)
 
