@@ -44,7 +44,7 @@ class mainWindow(qwid.QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.setFixedSize(435, 500)
+        self.setFixedSize(435, 550)
         self.initUI()
 
     def initUI(self):
@@ -113,32 +113,52 @@ class mainWindow(qwid.QMainWindow):
         self.tolLEdit.setAlignment(qcore.Qt.AlignRight)
         self.tolLEdit.move(300, 275)
 
+        # A Frame widget to enable or disable non-uniform grid
+        nuFrame = qwid.QFrame(self)
+        nuFrame.move(30, 300)
+
+        self.nugChBox = qwid.QCheckBox("Enable non-uniform grid", self)
+        self.nugChBox.resize(self.nugChBox.sizeHint())
+        self.nugChBox.move(30, 332)
+        self.nugChBox.stateChanged.connect(self.nuGridCheck)
+
+        self.betLabel = qwid.QLabel("Beta", self)
+        self.betLabel.resize(self.betLabel.sizeHint())
+        self.betLabel.setEnabled(False)
+        self.betLabel.move(280, 334)
+
+        self.betLEdit = qwid.QLineEdit("0.5", self)
+        self.betLEdit.setAlignment(qcore.Qt.AlignRight)
+        self.betLEdit.setEnabled(False)
+        self.betLEdit.resize(70, 30)
+        self.betLEdit.move(328, 328)
+
         # A few check boxes to decide what should be plotted
         self.solChBox = qwid.QCheckBox("Plot computed and analytical solution", self)
         self.solChBox.resize(self.solChBox.sizeHint())
-        self.solChBox.move(30, 332)
+        self.solChBox.move(30, 382)
 
         self.errChBox = qwid.QCheckBox("Plot error in computed solution", self)
         self.errChBox.resize(self.errChBox.sizeHint())
-        self.errChBox.move(30, 362)
+        self.errChBox.move(30, 412)
 
         self.conChBox = qwid.QCheckBox("Plot convergence of residual", self)
         self.conChBox.resize(self.conChBox.sizeHint())
         self.conChBox.setToolTip("To plot residual convergence, we need at least 3 V-Cycles")
         self.conChBox.setEnabled(False)
-        self.conChBox.move(30, 392)
+        self.conChBox.move(30, 442)
 
         # Start button - to start the simulation :)
         startButton = qwid.QPushButton('Start', self)
         startButton.clicked.connect(self.startSolver)
         startButton.resize(startButton.sizeHint())
-        startButton.move(180, 440)
+        startButton.move(180, 490)
 
         # Quit button - to quit the program :(
         quitButton = qwid.QPushButton('Quit', self)
         quitButton.clicked.connect(self.close)
         quitButton.resize(quitButton.sizeHint())
-        quitButton.move(300, 440)
+        quitButton.move(300, 490)
 
         # Window title and icon
         self.setWindowTitle('MG-Lite')
@@ -163,24 +183,58 @@ class mainWindow(qwid.QMainWindow):
             self.conChBox.setEnabled(False)
             self.conChBox.setChecked(False)
 
+    # This function enables or disables the LineEdit to enter the tangent-hyperbolic
+    # grid stretching parameter depending on the state of the CheckBox for non-uniform grid.
+    def nuGridCheck(self):
+        if self.nugChBox.isChecked() == True:
+            self.betLabel.setEnabled(True)
+            self.betLEdit.setEnabled(True)
+        else:
+            self.betLabel.setEnabled(False)
+            self.betLEdit.setEnabled(False)
+
     # This function interfaces with the multi-grid solver and sets the parameters
     # according to the inputs given in the window.
     # It then opens the console window and hands the baton to it.
     def startSolver(self):
+        tolValue = 0.0
+        # Check if tolerance specified is valid
+        try:
+            tolValue = float(self.tolLEdit.text())
+        except:
+            errDialog = qwid.QMessageBox.critical(self, 'Invalid Tolerance', "The value entered for tolerance is not a valid floating point number :(", qwid.QMessageBox.Ok)
+            return 1
+
+        # Check if uniform grid flag is enabled
+        mgSolver.nuFlag = self.nugChBox.isChecked()
+        if mgSolver.nuFlag:
+            betValue = 0.0
+            # Check if beta value specified is valid
+            try:
+                betValue = float(self.betLEdit.text())
+            except:
+                errDialog = qwid.QMessageBox.critical(self, 'Invalid Stretching Parameter', "The value entered for beta is not a valid floating point number :(", qwid.QMessageBox.Ok)
+                return 1
+
+            # If valid floating point is available, check if it is usable
+            if betValue <= 0.0 or betValue > 3.0:
+                errDialog = qwid.QMessageBox.critical(self, 'Bad Stretching Parameter', "The value entered for beta should lie between 0.0 and 3.0 :o", qwid.QMessageBox.Ok)
+                return 1
+
+            mgSolver.beta = betValue
+
         mgSolver.sInd = int(self.gsCBox.currentIndex()) + 2
+
         mgSolver.VDepth = self.vdSBox.value()
         mgSolver.vcCnt = self.vcSBox.value()
         mgSolver.preSm = self.preSBox.value()
         mgSolver.pstSm = self.pstSBox.value()
-        try:
-            tolValue = float(self.tolLEdit.text())
-            mgSolver.tolerance = tolValue
 
-            self.cWindow = consoleWindow(self.solChBox, self.errChBox, self.conChBox)
-            self.cWindow.runSolver()
+        mgSolver.tolerance = tolValue
 
-        except:
-            errDialog = qwid.QMessageBox.critical(self, 'Invalid Tolerance', "The value entered for tolerance is not a valid floating point number :(", qwid.QMessageBox.Ok)
+        # Open console window and run the solver
+        self.cWindow = consoleWindow(self.solChBox, self.errChBox, self.conChBox)
+        self.cWindow.runSolver()
 
     # Clingy function for a clingy app - makes sure that the user wants to quit the app
     def closeEvent(self, event):

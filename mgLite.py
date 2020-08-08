@@ -47,7 +47,10 @@ from matplotlib.ticker import MaxNLocator
 # Grid sizes: 2 3 5 9 17 33 65 129 257 513 1025 2049 4097 8193 16385
 sInd = 7
 
-# Stretching parameter for tangent-hyperbolic grid, 0 defaults to uniform grid
+# Flag to switch between uniform and non-uniform grid with tan-hyp stretching
+nuFlag = False
+
+# Stretching parameter for tangent-hyperbolic grid
 beta = 1.0
 
 # Depth of each V-cycle in multigrid (ideally VDepth = sInd - 1)
@@ -84,14 +87,11 @@ def main(oConsole):
     mgLHS = multigrid(mgRHS)
 
     computeError(mgLHS)
-    plotResult(0)
 
 
 def initGlobals():
     global N
-    global beta
     global VDepth
-    global ugFlag
     global hx, hx2
     global maxCount
     global vLev, zeroBC
@@ -117,11 +117,6 @@ def initGlobals():
 
     # Flag to determine if non-zero homogenous BC has to be applied or not
     zeroBC = False
-
-    # Set flag to switch between uniform and non-uniform grid calculations
-    ugFlag = True
-    if beta:
-        ugFlag = False
 
 
 ############################## MULTI-GRID SOLVER ###############################
@@ -216,7 +211,7 @@ def smooth(sCount):
     global N
     global hx2
     global vLev
-    global ugFlag
+    global nuFlag
     global xixx, xix2
     global rData, pData
 
@@ -225,16 +220,16 @@ def smooth(sCount):
         imposeBC(pData[vLev])
 
         # Gauss-Seidel smoothing
-        if ugFlag:
-            # For uniform grid
-            for j in range(1, n+1):
-                pData[vLev][j] = (pData[vLev][j+1] + pData[vLev][j-1] - hx2[vLev]*rData[vLev][j-1])*0.5
-        else:
+        if nuFlag:
             # For non-uniform grid
             for j in range(1, n+1):
                 pData[vLev][j] = (xix2[vLev][j-1]*(pData[vLev][j+1] + pData[vLev][j-1])*2.0 +
                                   xixx[vLev][j-1]*(pData[vLev][j+1] - pData[vLev][j-1])*hx[vLev] -
                                  rData[vLev][j-1]*2.0*hx2[vLev]) / (4.0*xix2[vLev][j-1])
+        else:
+            # For uniform grid
+            for j in range(1, n+1):
+                pData[vLev][j] = (pData[vLev][j+1] + pData[vLev][j-1] - hx2[vLev]*rData[vLev][j-1])*0.5
 
     imposeBC(pData[vLev])
 
@@ -265,7 +260,7 @@ def restrict():
 # Solves at coarsest level using an iterative solver
 def solve():
     global vLev
-    global ugFlag
+    global nuFlag
     global N, hx2
     global maxCount
     global tolerance
@@ -280,16 +275,16 @@ def solve():
         imposeBC(pData[vLev])
 
         # Gauss-Seidel iterative solver
-        if ugFlag:
-            # For uniform grid
-            for i in range(1, n+1):
-                pData[vLev][i] = (pData[vLev][i+1] + pData[vLev][i-1] - hx2[vLev]*rData[vLev][i-1])*0.5
-        else:
+        if nuFlag:
             # For non-uniform grid
             for i in range(1, n+1):
                 pData[vLev][i] = (xix2[vLev][i-1]*(pData[vLev][i+1] + pData[vLev][i-1])*2.0 +
                                   xixx[vLev][i-1]*(pData[vLev][i+1] - pData[vLev][i-1])*hx[vLev] -
                                  rData[vLev][i-1]*2.0*hx2[vLev]) / (4.0*xix2[vLev][i-1])
+        else:
+            # For uniform grid
+            for i in range(1, n+1):
+                pData[vLev][i] = (pData[vLev][i+1] + pData[vLev][i-1] - hx2[vLev]*rData[vLev][i-1])*0.5
 
         maxErr = np.amax(np.abs(rData[vLev] - laplace(pData[vLev])))
         if maxErr < tolerance:
@@ -328,18 +323,20 @@ def prolong():
 # Computes the 1D laplacian of function
 def laplace(function):
     global vLev
-    global ugFlag
+    global nuFlag
     global N, hx2
     global xixx, xix2
 
     n = N[vLev]
 
     gradient = np.zeros(n)
-    if ugFlag:
-        gradient = (function[2:] - 2.0*function[1:n+1] + function[:n]) / hx2[vLev]
-    else:
+    if nuFlag:
+        # For non-uniform grid
         gradient = xix2[vLev]*(function[2:] - 2.0*function[1:n+1] + function[:n]) / hx2[vLev] + \
                    xixx[vLev]*(function[2:] - function[:n]) / (2.0*hx[vLev])
+    else:
+        # For uniform grid
+        gradient = (function[2:] - 2.0*function[1:n+1] + function[:n]) / hx2[vLev]
 
     return gradient
 
@@ -362,7 +359,7 @@ def initVariables():
 def initGrid():
     global N
     global beta
-    global ugFlag
+    global nuFlag
     global xPts, xixx, xix2
 
     # Uniform grid default values
@@ -371,7 +368,7 @@ def initGrid():
     xix2 = [np.ones_like(i) for i in xPts]
     xixx = [np.zeros_like(i) for i in xPts]
 
-    if not ugFlag:
+    if nuFlag:
         xi = np.linspace(0.0, 1.0, N[0])
         xPts[0] = np.array([(1.0 - np.tanh(beta*(1.0 - 2.0*i))/np.tanh(beta))/2.0 for i in xi])
         xi_x[0] = np.array([np.tanh(beta)/(beta*(1.0 - ((1.0 - 2.0*k)*np.tanh(beta))**2.0)) for k in xPts[0]])
