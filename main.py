@@ -44,94 +44,102 @@ class mainWindow(qwid.QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.setFixedSize(435, 550)
+        self.setFixedSize(427, 550)
         self.initUI()
 
     def initUI(self):
+
         # Widgets to set grid size
-        gsLabel = qwid.QLabel("Select number of points in domain", self)
+        gsLabel = qwid.QLabel("Number of points in the domain", self)
         gsLabel.resize(gsLabel.sizeHint())
-        gsLabel.move(30, 32)
+        gsLabel.move(32, 32)
 
         self.gsCBox = qwid.QComboBox(self)
-        self.gsCBox.setToolTip("Grid sizes are of form 2^n + 1 to facilitate restrictions and prolongations of V-Cycle")
+        self.gsCBox.setToolTip("<p>Grid should have 2^n + 1 points to enable restriction and prolongation during V-Cycles<\p>")
         for i in range(2, 15):
             n = 2**i + 1
             self.gsCBox.addItem(str(n))
         self.gsCBox.currentIndexChanged.connect(self.gsCBoxSelection)
-        self.gsCBox.move(300, 25)
+        self.gsCBox.move(295, 25)
 
         # Widgets to set depth of V-Cycles
-        vdLabel = qwid.QLabel("Set depth of multi-grid V-Cycles", self)
+        vdLabel = qwid.QLabel("Depth of multi-grid V-Cycles", self)
         vdLabel.resize(vdLabel.sizeHint())
-        vdLabel.move(30, 82)
+        vdLabel.move(32, 82)
 
         self.vdSBox = qwid.QSpinBox(self)
-        self.vdSBox.setToolTip("Depth is restricted by number of points chosen above")
+        self.vdSBox.setToolTip("<p>Depth is restricted by the number of points chosen above<\p>")
         self.vdSBox.setMinimum(1)
         self.vdSBox.setMaximum(1)
-        self.vdSBox.move(300, 75)
+        self.vdSBox.move(295, 75)
 
         # Widgets to set number of V-Cycles
-        vcLabel = qwid.QLabel("Set number of V-Cycles to be computed", self)
+        vcLabel = qwid.QLabel("Number of V-Cycles to be computed", self)
         vcLabel.resize(vcLabel.sizeHint())
-        vcLabel.move(30, 132)
+        vcLabel.move(32, 132)
 
         self.vcSBox = qwid.QSpinBox(self)
         self.vcSBox.setMinimum(1)
         self.vcSBox.setMaximum(32)
-        self.vcSBox.move(300, 125)
+        self.vcSBox.move(295, 125)
         self.vcSBox.valueChanged.connect(self.vcCountCheck)
 
         # Widgets to set number of pre-smoothing iterations
-        preLabel = qwid.QLabel("Set number of pre-smoothing iterations", self)
+        preLabel = qwid.QLabel("Number of pre-smoothing iterations", self)
         preLabel.resize(preLabel.sizeHint())
-        preLabel.move(30, 182)
+        preLabel.move(32, 182)
 
         self.preSBox = qwid.QSpinBox(self)
         self.preSBox.setMinimum(1)
         self.preSBox.setMaximum(16)
-        self.preSBox.move(300, 175)
+        self.preSBox.move(295, 175)
 
         # Widgets to set number of post-smoothing iterations
-        pstLabel = qwid.QLabel("Set number of post-smoothing iterations", self)
+        pstLabel = qwid.QLabel("Number of post-smoothing iterations", self)
         pstLabel.resize(pstLabel.sizeHint())
-        pstLabel.move(30, 232)
+        pstLabel.move(32, 232)
 
         self.pstSBox = qwid.QSpinBox(self)
         self.pstSBox.setMinimum(1)
         self.pstSBox.setMaximum(16)
-        self.pstSBox.move(300, 225)
+        self.pstSBox.move(295, 225)
 
         # Widgets to set tolerance for iterative solver
-        tolLabel = qwid.QLabel("Enter tolerance for iterative solver", self)
+        tolLabel = qwid.QLabel("Tolerance of Gauss-Seidel solver", self)
         tolLabel.resize(tolLabel.sizeHint())
-        tolLabel.move(30, 282)
+        tolLabel.move(32, 282)
 
         self.tolLEdit = qwid.QLineEdit("1.0e-6", self)
-        self.tolLEdit.setToolTip("Please enter tolerance in scientific notion as shown")
+        self.tolLEdit.setToolTip("<p>It is best to enter tolerance in scientific notion as shown<\p>")
         self.tolLEdit.setAlignment(qcore.Qt.AlignRight)
-        self.tolLEdit.move(300, 275)
+        self.tolLEdit.move(295, 275)
 
-        # A Frame widget to enable or disable non-uniform grid
+        # A Frame widget containing widgets to enable or disable non-uniform grid
         nuFrame = qwid.QFrame(self)
-        nuFrame.move(30, 300)
+        nuFrame.setFrameStyle(qwid.QFrame.StyledPanel)
+        nuFrame.resize(375, 46)
+        nuFrame.move(25, 322)
 
+        # Check box to enable non-uniform grid
         self.nugChBox = qwid.QCheckBox("Enable non-uniform grid", self)
+        self.nugChBox.setToolTip("<p>Use a tangent-hyperbolic grid which is fine near the boundaries and coarse at the center of the domain<\p>")
         self.nugChBox.resize(self.nugChBox.sizeHint())
-        self.nugChBox.move(30, 332)
+        self.nugChBox.move(40, 335)
         self.nugChBox.stateChanged.connect(self.nuGridCheck)
 
+        # Widgets to set the tangent-hyperbolic grid stretching factor, beta
         self.betLabel = qwid.QLabel("Beta", self)
+        self.betLabel.setToolTip("<nobr>Stretching parameter for <\nobr>tangent-hyperbolic grid")
         self.betLabel.resize(self.betLabel.sizeHint())
         self.betLabel.setEnabled(False)
-        self.betLabel.move(280, 334)
+        self.betLabel.move(275, 337)
 
         self.betLEdit = qwid.QLineEdit("0.5", self)
+        self.betLEdit.setToolTip("<p>Must be a floating point number greater than 0, but not greater than 3<\p>")
         self.betLEdit.setAlignment(qcore.Qt.AlignRight)
         self.betLEdit.setEnabled(False)
         self.betLEdit.resize(70, 30)
-        self.betLEdit.move(328, 328)
+        self.betLEdit.move(322, 330)
 
         # A few check boxes to decide what should be plotted
         self.solChBox = qwid.QCheckBox("Plot computed and analytical solution", self)
@@ -144,7 +152,7 @@ class mainWindow(qwid.QMainWindow):
 
         self.conChBox = qwid.QCheckBox("Plot convergence of residual", self)
         self.conChBox.resize(self.conChBox.sizeHint())
-        self.conChBox.setToolTip("To plot residual convergence, we need at least 3 V-Cycles")
+        self.conChBox.setToolTip("<p>To plot residual convergence, we need at least 3 V-Cycles<\p>")
         self.conChBox.setEnabled(False)
         self.conChBox.move(30, 442)
 
@@ -202,7 +210,7 @@ class mainWindow(qwid.QMainWindow):
         try:
             tolValue = float(self.tolLEdit.text())
         except:
-            errDialog = qwid.QMessageBox.critical(self, 'Invalid Tolerance', "The value entered for tolerance is not a valid floating point number :(", qwid.QMessageBox.Ok)
+            errDialog = qwid.QMessageBox.critical(self, 'Invalid Tolerance', "The specified tolerance is not a valid floating point number! :(", qwid.QMessageBox.Ok)
             return 1
 
         # Check if uniform grid flag is enabled
@@ -213,12 +221,16 @@ class mainWindow(qwid.QMainWindow):
             try:
                 betValue = float(self.betLEdit.text())
             except:
-                errDialog = qwid.QMessageBox.critical(self, 'Invalid Stretching Parameter', "The value entered for beta is not a valid floating point number :(", qwid.QMessageBox.Ok)
+                errDialog = qwid.QMessageBox.critical(self, 'Invalid Stretching Parameter', "The specified beta is not a valid floating point number! :(", qwid.QMessageBox.Ok)
                 return 1
 
             # If valid floating point is available, check if it is usable
+            if betValue <= 0.0:
+                errDialog = qwid.QMessageBox.critical(self, 'Bad Stretching Parameter', "Beta should be greater than 0! :o", qwid.QMessageBox.Ok)
+                return 1
+
             if betValue <= 0.0 or betValue > 3.0:
-                errDialog = qwid.QMessageBox.critical(self, 'Bad Stretching Parameter', "The value entered for beta should lie between 0.0 and 3.0 :o", qwid.QMessageBox.Ok)
+                errDialog = qwid.QMessageBox.critical(self, 'Bad Stretching Parameter', "Beta is too high (> 3.0) to make a useful grid. :-|", qwid.QMessageBox.Ok)
                 return 1
 
             mgSolver.beta = betValue
