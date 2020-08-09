@@ -3,7 +3,7 @@
 MG-Lite is a multigrid solver written in Python.
 It solves a very simple one-dimensional Poisson equation to demonstrate the working of the multigrid V-cycle.
 The solver uses PyQt5 to generate its GUI, through which the user can tweak multi-grid parameters and plot results.
-The multi-grid algorithm is written in the file titled ``mgLite.py``
+The file ``mgLite.py`` contains the multi-grid algorithm, while ``main.py`` draws the PyQt5 GUI.
 
 ## Installing MG-Lite
 
@@ -18,6 +18,10 @@ To install ``MG-Lite``, you need to first clone the git repository into your loc
 or
 
 `python main.py`
+
+The solver also supports command line execution without using the GUI.
+This can be done by invoking the solver directly by ``./mgLite.py`` or ``python mgLite.py`` at the command line.
+Note that in this case, the solver will use the default values of multi-grid parameters written in the file ``mgLite.py``.
 
 Please make sure that the following Python modules are installed before executing the solver.
 

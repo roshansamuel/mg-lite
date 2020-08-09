@@ -243,7 +243,7 @@ def calcResidual():
     iTemp[vLev][1:-1] = rData[vLev] - laplace(pData[vLev])
 
 
-# Reduces the size of the array to a lower level, 2^(n - 1) + 1
+# Restricts the data from an array of size 2^n + 1 to a smaller array of size 2^(n - 1) + 1
 def restrict():
     global N
     global vLev
@@ -252,12 +252,13 @@ def restrict():
     pLev = vLev
     vLev += 1
 
+    # Full weighted restriction - this is the transpose of the interpolation operator used in prolong().
     for i in range(1, N[vLev] + 1):
         i2 = i*2
         rData[vLev][i-1] = 0.5*iTemp[pLev][i2 - 1] + 0.25*(iTemp[pLev][i2 - 2] + iTemp[pLev][i2])
 
 
-# Solves at coarsest level using an iterative solver
+# Solves at coarsest level using the Gauss-Seidel iterative solver
 def solve():
     global vLev
     global nuFlag
@@ -303,7 +304,7 @@ def solve():
     return 0
 
 
-# Increases the size of the array to a higher level, 2^(n + 1) + 1
+# Interpolates the data from an array of size 2^n + 1 to a larger array of size 2^(n + 1) + 1
 def prolong():
     global N
     global vLev
@@ -312,6 +313,8 @@ def prolong():
     pLev = vLev
     vLev -= 1
 
+    # For coincident points, transfer the data as it is.
+    # For mid-points, use linear interpolation.
     for i in range(1, N[vLev] + 1):
         i2 = int(i/2) + 1;
         if i % 2:
@@ -329,16 +332,16 @@ def laplace(function):
 
     n = N[vLev]
 
-    gradient = np.zeros(n)
+    laplacian = np.zeros(n)
     if nuFlag:
         # For non-uniform grid
-        gradient = xix2[vLev]*(function[2:] - 2.0*function[1:n+1] + function[:n]) / hx2[vLev] + \
-                   xixx[vLev]*(function[2:] - function[:n]) / (2.0*hx[vLev])
+        laplacian = xix2[vLev]*(function[2:] - 2.0*function[1:n+1] + function[:n]) / hx2[vLev] + \
+                    xixx[vLev]*(function[2:] - function[:n]) / (2.0*hx[vLev])
     else:
         # For uniform grid
-        gradient = (function[2:] - 2.0*function[1:n+1] + function[:n]) / hx2[vLev]
+        laplacian = (function[2:] - 2.0*function[1:n+1] + function[:n]) / hx2[vLev]
 
-    return gradient
+    return laplacian
 
 
 # Initialize the arrays used in MG algorithm
@@ -368,13 +371,16 @@ def initGrid():
     xix2 = [np.ones_like(i) for i in xPts]
     xixx = [np.zeros_like(i) for i in xPts]
 
+    # Overwrite above arrays with values for tangent-hyperbolic grid is nuFlag is enabled.
     if nuFlag:
+        # Calculate the values for finest grid.
         xi = np.linspace(0.0, 1.0, N[0])
         xPts[0] = np.array([(1.0 - np.tanh(beta*(1.0 - 2.0*i))/np.tanh(beta))/2.0 for i in xi])
         xi_x[0] = np.array([np.tanh(beta)/(beta*(1.0 - ((1.0 - 2.0*k)*np.tanh(beta))**2.0)) for k in xPts[0]])
         xixx[0] = np.array([-4.0*(np.tanh(beta)**3.0)*(1.0 - 2.0*k)/(beta*(1.0 - (np.tanh(beta)*(1.0 - 2.0*k))**2.0)**2.0) for k in xPts[0]])
         xix2[0] = np.array([k*k for k in xi_x[0]])
 
+        # For coarser grids, simply use the values at every even index of the finer grid array.
         for i in range(1, VDepth+1):
             xPts[i] = xPts[i-1][::2]
             xi_x[i] = xi_x[i-1][::2]
@@ -458,18 +464,21 @@ def plotResult(plotType):
     plt.figure(figsize=(13, 9))
 
     pSoln = pData[0]
+    # Plot the computed solution on top of the analytic solution.
     if plotType == 0:
         plt.plot(xPts[0], pAnlt, label='Analytic', marker='*', markersize=20, linewidth=4)
         plt.plot(xPts[0], pSoln[1:-1], label='Computed', marker='+', markersize=20, linewidth=4)
         plt.xlabel('x', fontsize=40)
         plt.ylabel('p', fontsize=40)
 
+    # Plot the error in computed solution with respect to analytic solution.
     elif plotType == 1:
         pErr = np.abs(pAnlt - pSoln[1:-1])
         plt.semilogy(xPts[0], pErr, label='Error', marker='*', markersize=20, linewidth=4)
         plt.xlabel('x', fontsize=40)
         plt.ylabel('e_p', fontsize=40)
 
+    # Plot the convergence of residual
     elif plotType == 2:
         vcAxis = np.arange(len(rConv)) + 1
         plt.semilogy(vcAxis, rConv, label='Residual', marker='*', markersize=20, linewidth=4)

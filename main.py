@@ -48,8 +48,7 @@ class mainWindow(qwid.QMainWindow):
         self.initUI()
 
     def initUI(self):
-
-        # Widgets to set grid size
+        # Widgets to get grid size
         gsLabel = qwid.QLabel("Number of points in the domain", self)
         gsLabel.resize(gsLabel.sizeHint())
         gsLabel.move(32, 32)
@@ -62,7 +61,7 @@ class mainWindow(qwid.QMainWindow):
         self.gsCBox.currentIndexChanged.connect(self.gsCBoxSelection)
         self.gsCBox.move(295, 25)
 
-        # Widgets to set depth of V-Cycles
+        # Widgets to get depth of V-Cycles
         vdLabel = qwid.QLabel("Depth of multi-grid V-Cycles", self)
         vdLabel.resize(vdLabel.sizeHint())
         vdLabel.move(32, 82)
@@ -73,7 +72,7 @@ class mainWindow(qwid.QMainWindow):
         self.vdSBox.setMaximum(1)
         self.vdSBox.move(295, 75)
 
-        # Widgets to set number of V-Cycles
+        # Widgets to get number of V-Cycles
         vcLabel = qwid.QLabel("Number of V-Cycles to be computed", self)
         vcLabel.resize(vcLabel.sizeHint())
         vcLabel.move(32, 132)
@@ -84,7 +83,7 @@ class mainWindow(qwid.QMainWindow):
         self.vcSBox.move(295, 125)
         self.vcSBox.valueChanged.connect(self.vcCountCheck)
 
-        # Widgets to set number of pre-smoothing iterations
+        # Widgets to get number of pre-smoothing iterations
         preLabel = qwid.QLabel("Number of pre-smoothing iterations", self)
         preLabel.resize(preLabel.sizeHint())
         preLabel.move(32, 182)
@@ -94,7 +93,7 @@ class mainWindow(qwid.QMainWindow):
         self.preSBox.setMaximum(16)
         self.preSBox.move(295, 175)
 
-        # Widgets to set number of post-smoothing iterations
+        # Widgets to get number of post-smoothing iterations
         pstLabel = qwid.QLabel("Number of post-smoothing iterations", self)
         pstLabel.resize(pstLabel.sizeHint())
         pstLabel.move(32, 232)
@@ -104,7 +103,7 @@ class mainWindow(qwid.QMainWindow):
         self.pstSBox.setMaximum(16)
         self.pstSBox.move(295, 225)
 
-        # Widgets to set tolerance for iterative solver
+        # Widgets to get tolerance for iterative solver
         tolLabel = qwid.QLabel("Tolerance of Gauss-Seidel solver", self)
         tolLabel.resize(tolLabel.sizeHint())
         tolLabel.move(32, 282)
@@ -127,7 +126,7 @@ class mainWindow(qwid.QMainWindow):
         self.nugChBox.move(40, 335)
         self.nugChBox.stateChanged.connect(self.nuGridCheck)
 
-        # Widgets to set the tangent-hyperbolic grid stretching factor, beta
+        # Widgets to get the tangent-hyperbolic grid stretching factor, beta
         self.betLabel = qwid.QLabel("Beta", self)
         self.betLabel.setToolTip("<nobr>Stretching parameter for <\nobr>tangent-hyperbolic grid")
         self.betLabel.resize(self.betLabel.sizeHint())
@@ -175,14 +174,14 @@ class mainWindow(qwid.QMainWindow):
         # Reveal thyself
         self.show()
 
-    # This function restricts the maximum value in the SpinBox to set V-Cycle depth
-    # according to the grid size
+    # This function restricts the maximum value of the SpinBox used to set V-Cycle depth.
+    # This maximum value is obtained from the grid-size, passed as an index, i
     def gsCBoxSelection(self, i):
         maxDepth = i + 1
         self.vdSBox.setMaximum(i + 1)
 
     # This function enables or disables the CheckBox to plot convergence of resiudal
-    # according to the number of V-Cycles computed.
+    # This is decided by the number of V-Cycles to be computed.
     # It makes no sense to plot convergence for less than 3 V-Cycles
     def vcCountCheck(self):
         if self.vcSBox.value() > 2:
@@ -191,8 +190,9 @@ class mainWindow(qwid.QMainWindow):
             self.conChBox.setEnabled(False)
             self.conChBox.setChecked(False)
 
-    # This function enables or disables the LineEdit to enter the tangent-hyperbolic
-    # grid stretching parameter depending on the state of the CheckBox for non-uniform grid.
+    # This function enables or disables the LineEdit used to enter the tangent-hyperbolic
+    # grid stretching parameter, beta.
+    # This decision is based on the state of the CheckBox for non-uniform grid.
     def nuGridCheck(self):
         if self.nugChBox.isChecked() == True:
             self.betLabel.setEnabled(True)
@@ -201,8 +201,8 @@ class mainWindow(qwid.QMainWindow):
             self.betLabel.setEnabled(False)
             self.betLEdit.setEnabled(False)
 
-    # This function interfaces with the multi-grid solver and sets the parameters
-    # according to the inputs given in the window.
+    # This function interfaces with the multi-grid solver and sets its parameters.
+    # These parameters are read from the inputs given in the window.
     # It then opens the console window and hands the baton to it.
     def startSolver(self):
         tolValue = 0.0
@@ -233,8 +233,10 @@ class mainWindow(qwid.QMainWindow):
                 errDialog = qwid.QMessageBox.critical(self, 'Bad Stretching Parameter', "Beta is too high (> 3.0) to make a useful grid. :-|", qwid.QMessageBox.Ok)
                 return 1
 
+            # If both above checks are passed, have no fear! Set the value of beta.
             mgSolver.beta = betValue
 
+        # Now set all the other less complicated parameters
         mgSolver.sInd = int(self.gsCBox.currentIndex()) + 2
 
         mgSolver.VDepth = self.vdSBox.value()
@@ -268,7 +270,7 @@ class consoleWindow(qwid.QMainWindow):
     def __init__(self, sCBox, eCBox, rCBox):
         super().__init__()
 
-        # Three boolean flags for the three check boxes for plots in the main window
+        # Three boolean flags for the three check boxes in the main window for plots
         self.sPlot = sCBox.isChecked()
         self.ePlot = eCBox.isChecked()
         self.rPlot = rCBox.isChecked()
@@ -312,7 +314,7 @@ class consoleWindow(qwid.QMainWindow):
         mgSolver.main(self)
         qwid.QApplication.processEvents()
 
-    # This function is called by the MG solver at all places where it normally used the print()
+    # This function is called by the MG solver at all places where it normally uses the print()
     # command. The string passed to the print command is instead passed to this function,
     # which sends it to the text box of the console window.
     def updateTEdit(self, cOutString):
